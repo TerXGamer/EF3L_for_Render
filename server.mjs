@@ -53,8 +53,39 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(port, "0.0.0.0", () => {
-  console.log(`Ifal Render server listening on ${port}`);
+server.listen(port, "0.0.0.0", async () => {
+  console.log(`Ifal Render server listening on port ${port}`);
+  
+  // نظام الصيانة المطور لحذف أي حساب وتدمير بياناته بالكامل
+  const userToDelete = process.env.DELETE_ACCOUNT_NOW;
+  
+  if (userToDelete && userToDelete.trim() !== "") {
+    try {
+      const cleanUsername = userToDelete.trim().toLowerCase();
+      
+      // التأكد من إنشاء الاتصال بقاعدة البيانات أولاً
+      if (!pool) {
+        pool = new Pool({
+          connectionString: process.env.DATABASE_URL,
+          ssl: { rejectUnauthorized: false }
+        });
+      }
+      
+      // تنفيذ أمر الحذف الشامل للمستخدم (والمهام المرتبطة به إذا كان هناك ربط)
+      const result = await pool.query(
+        `DELETE FROM accounts WHERE username = $1;`,
+        [cleanUsername]
+      );
+      
+      if (result.rowCount > 0) {
+        console.log(`[نظام الصيانة] تم بنجاح حذف الحساب (${cleanUsername}) ومسح كافة بياناته من قاعدة البيانات!`);
+      } else {
+        console.log(`[نظام الصيانة] تنبيه: لم يتم العثور على حساب باسم (${cleanUsername}) في قاعدة البيانات.`);
+      }
+    } catch (error) {
+      console.error("[نظام الصيانة] خطأ أثناء محاولة حذف الحساب:", error);
+    }
+  }
 });
 
 async function handleAccountRequest(request, response) {

@@ -56,34 +56,44 @@ const server = createServer(async (request, response) => {
 server.listen(port, "0.0.0.0", async () => {
   console.log(`Ifal Render server listening on port ${port}`);
   
-  // نظام الصيانة المطور لحذف أي حساب وتدمير بياناته بالكامل
-  const userToDelete = process.env.DELETE_ACCOUNT_NOW;
+  // نظام الصيانة السريع لحذف حسابات متعددة دفعة واحدة بفواصل (,)
+  const usersToDeleteRaw = process.env.DELETE_ACCOUNT_NOW;
   
-  if (userToDelete && userToDelete.trim() !== "") {
+  if (usersToDeleteRaw && usersToDeleteRaw.trim() !== "") {
     try {
-      const cleanUsername = userToDelete.trim().toLowerCase();
+      // تقسيم النص بناءً على الفاصلة، تنظيف الفراغات، وتحويل الأحرف لصغيرة
+      const usernamesArray = usersToDeleteRaw
+        .split(",")
+        .map(u => u.trim().toLowerCase())
+        .filter(u => u !== "");
       
-      // التأكد من إنشاء الاتصال بقاعدة البيانات أولاً
-      if (!pool) {
-        pool = new Pool({
-          connectionString: process.env.DATABASE_URL,
-          ssl: { rejectUnauthorized: false }
-        });
-      }
-      
-      // تنفيذ أمر الحذف الشامل للمستخدم (والمهام المرتبطة به إذا كان هناك ربط)
-      const result = await pool.query(
-        `DELETE FROM accounts WHERE username = $1;`,
-        [cleanUsername]
-      );
-      
-      if (result.rowCount > 0) {
-        console.log(`[نظام الصيانة] تم بنجاح حذف الحساب (${cleanUsername}) ومسح كافة بياناته من قاعدة البيانات!`);
-      } else {
-        console.log(`[نظام الصيانة] تنبيه: لم يتم العثور على حساب باسم (${cleanUsername}) في قاعدة البيانات.`);
+      if (usernamesArray.length > 0) {
+        if (!pool) {
+          pool = new Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false }
+          });
+        }
+        
+        console.log(`[نظام الصيانة] جاري معالجة حذف دفعة مكونة من (${usernamesArray.length}) حسابات...`);
+        
+        // حلقة تكرارية للمرور على كل اسم وحذفه مع طباعة تقرير مفصل في الـ Logs
+        for (const username of usernamesArray) {
+          const result = await pool.query(
+            `DELETE FROM accounts WHERE username = $1;`,
+            [username]
+          );
+          
+          if (result.rowCount > 0) {
+            console.log(`[نظام الصيانة] نجاح: تم تدمير الحساب (${username}) وحذف جميع بياناته.`);
+          } else {
+            console.log(`[نظام الصيانة] تنبيه: الحساب (${username}) غير موجود في قاعدة البيانات أصلاً.`);
+          }
+        }
+        console.log(`[نظام الصيانة] اكتملت عملية تصفية الحسابات المطلوبة بنجاح!`);
       }
     } catch (error) {
-      console.error("[نظام الصيانة] خطأ أثناء محاولة حذف الحساب:", error);
+      console.error("[نظام الصيانة] خطأ أثناء محاولة حذف الحسابات المتعددة:", error);
     }
   }
 });

@@ -268,7 +268,7 @@ async function readAccount(username) {
   const result = await getPool().query(
     `SELECT username, name, email, salt, password_hash, data, summary, created_at, updated_at
        FROM accounts
-      WHERE username = $1`,
+      WHERE LOWER(username) = LOWER($1)`, // تم تعديل هذا السطر للمقارنة بحروف صغيرة دائماً داخل القاعدة
     [username],
   );
 

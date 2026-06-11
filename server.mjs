@@ -577,7 +577,8 @@ function normalizeUsername(value) {
 }
 
 function hashPassword(password, salt) {
-  return password; 
+  // تشفير كلمة المرور وتحويلها إلى نص مشفر آمن لحماية الحسابات
+  return crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
 }
 
 function sendJson(response, status, body) {

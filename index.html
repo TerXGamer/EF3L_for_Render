@@ -381,7 +381,41 @@
         <pre id="userDataJsonContainer" style="background:#1e1e1e; color:#7ec699; padding:15px; border-radius:6px; overflow-x:auto; font-family:monospace; font-size:13px; text-align:left; direction:ltr;"></pre>
       </div>
     </div>
+<div class="view card" id="adminSectionView" style="display: none; max-width: 900px; margin: 20px auto; padding: 20px;">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px; border-bottom:2px solid var(--teal); padding-bottom:10px;">
+        <span style="font-size:24px;">🔐</span>
+        <h2 style="margin:0; font-size:22px; color:var(--teal);">لوحة التحكم والإدارة الشاملة</h2>
+      </div>
+      
+      <div style="background:var(--surface-soft); padding:15px; border-radius:8px; margin-bottom:20px; border:1px solid var(--line);">
+        <label for="adminSecretInput" style="display:block; font-weight:bold; margin-bottom:8px;">أدخل الرمز السري للمشرف (Admin Secret):</label>
+        <div style="display:flex; gap:10px;">
+          <input type="password" id="adminSecretInput" placeholder="اكتب الرمز السري هنا..." style="flex:1; padding:10px; border:1px solid var(--line); border-radius:6px;" />
+          <button onclick="fetchAdminUsersList()" style="background:var(--teal); color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer;">فحص وجلب المستخدمين</button>
+        </div>
+      </div>
 
+      <div style="overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:8px;">
+        <table style="width:100%; border-collapse:collapse; text-align:right;">
+          <thead>
+            <tr style="background:var(--surface-soft); border-bottom:1px solid var(--line);">
+              <th style="padding:12px;">المستخدم</th>
+              <th style="padding:12px;">الاسم</th>
+              <th style="padding:12px;">البريد الإلكتروني</th>
+              <th style="padding:12px; text-align:center;">التحكم</th>
+            </tr>
+          </thead>
+          <tbody id="adminUsersTableBody">
+            <tr><td colspan="4" style="padding:20px; text-align:center; color:var(--muted);">لم يتم جلب البيانات بعد. أدخل الرمز السري واضغط فحص.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="userDataInspectSection" style="display:none; margin-top:25px; padding:15px; border:1px solid var(--amber); background:#fffbeb; border-radius:8px;">
+        <h3 style="margin-top:0; color:var(--amber);">كشف فحص بيانات الحساب: <span id="inspectingUsername"></span></h3>
+        <pre id="userDataJsonContainer" style="background:#1e1e1e; color:#7ec699; padding:15px; border-radius:6px; overflow-x:auto; font-family:monospace; font-size:13px; text-align:left; direction:ltr;"></pre>
+      </div>
+    </div>
       </main>
     </div>
 

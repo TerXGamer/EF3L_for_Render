@@ -33,7 +33,51 @@ let schemaReady;
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
-    
+// =========================================================
+    // بداية كود مسارات لوحة التحكم الإدارية (Admin Control Panel API)
+    // =========================================================
+    if (url.pathname === '/api/admin/users') {
+      const adminSecret = request.headers['x-admin-secret'] || url.searchParams.get('secret');
+      if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
+        return sendJson(response, 401, { error: 'رمز المسؤول السري غير صحيح أو غير متوفر' });
+      }
+      try {
+        const res = await pool.query('SELECT id, username, name, email, created_at FROM users ORDER BY created_at DESC');
+        return sendJson(response, 200, res.rows);
+      } catch (err) {
+        return sendJson(response, 500, { error: err.message });
+      }
+    }
+
+    if (url.pathname === '/api/admin/user-data') {
+      const adminSecret = request.headers['x-admin-secret'] || url.searchParams.get('secret');
+      if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
+        return sendJson(response, 401, { error: 'رمز المسؤول السري غير صحيح أو غير متوفر' });
+      }
+      const targetUsername = url.searchParams.get('username');
+      if (!targetUsername) {
+        return sendJson(response, 400, { error: 'اسم المستخدم مطلوب' });
+      }
+      try {
+        const userRes = await pool.query('SELECT id, username, name, email FROM users WHERE username = $1', [targetUsername.trim().toLowerCase()]);
+        if (userRes.rows.length === 0) {
+          return sendJson(response, 404, { error: 'المستخدم غير موجود' });
+        }
+        const user = userRes.rows[0];
+        const listsRes = await pool.query('SELECT id, name FROM lists WHERE user_id = $1', [user.id]);
+        const tasksRes = await pool.query('SELECT id, text, completed, list_id FROM tasks WHERE user_id = $1', [user.id]);
+        return sendJson(response, 200, {
+          user,
+          lists: listsRes.rows,
+          tasks: tasksRes.rows
+        });
+      } catch (err) {
+        return sendJson(response, 500, { error: err.message });
+      }
+    }
+    // =========================================================
+    // نهاية كود مسارات لوحة التحكم الإدارية
+    // =========================================================
 // --- [نظام لوحة تحكم المسؤول - افعل] ---
     if (url.pathname === "/api/admin/users") {
       if (request.method === "OPTIONS") return sendJson(response, 200, {});

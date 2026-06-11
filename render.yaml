@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: ifal-for-render
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ifal-render-db
+          property: connectionString
+
+databases:
+  - name: ifal-render-db
+    databaseName: ifal
+    user: ifal
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "18"

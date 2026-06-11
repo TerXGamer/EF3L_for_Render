@@ -384,27 +384,32 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="app.js?v=20260610-13"></script>
-
-    <div id="adminOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99999; padding:20px; font-family:inherit; direction:rtl; overflow-y:auto; backdrop-filter: blur(4px);">
+<div id="adminOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99999; padding:20px; font-family:inherit; direction:rtl; overflow-y:auto; backdrop-filter: blur(4px);">
   <div style="background:var(--surface); max-width:900px; margin:30px auto; padding:28px; border-radius:12px; box-shadow: var(--shadow); border:1px solid var(--line);">
     
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:2px solid var(--teal); padding-bottom:12px;">
       <h2 style="color:var(--teal); margin:0; font-size:22px; display:flex; align-items:center; gap:8px;">
-        <span>✓</span> لوحة الإشراف والمتابعة العليا (افعل)
+        <span>✓</span> لوحة الإشراف والمتابعة العليا والمطابقة الذكية
       </h2>
       <button onclick="document.getElementById('adminOverlay').style.display='none'" style="background:var(--coral, #c2410c); color:white; border:none; padding:6px 16px; border-radius:6px; cursor:pointer; font-weight:bold;">إغلاق الواجهة</button>
     </div>
     
     <div id="adminAuthSection" style="margin-bottom:25px; background:var(--surface-soft); padding:16px; border-radius:8px; border:1px solid var(--line);">
-      <label style="display:block; margin-bottom:8px; font-weight:bold; color:var(--text);">مفتاح الأمان للمسؤول (ADMIN_SECRET):</label>
-      <div style="display:flex; gap:10px;">
-        <input type="password" id="adminSecretInput" style="flex:1; padding:10px; border:1px solid var(--line); border-radius:6px; background:var(--field);" placeholder="أدخل الرمز السري الفيدرالي الخاص بك...">
-        <button onclick="loadAdminUsers()" style="background:var(--teal); color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold;">جلب وتحديث القائمة</button>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div>
+          <label style="display:block; margin-bottom:4px; font-weight:bold; color:var(--text);">اسم مستخدم الآدمن الحالي الخاص بك:</label>
+          <input type="text" id="adminUserInput" style="width:100%; padding:10px; border:1px solid var(--line); border-radius:6px; background:var(--field);" placeholder="اكتب اسم الحساب المضاف في الـ ADMIN_SET...">
+        </div>
+        <div>
+          <label style="display:block; margin-bottom:4px; font-weight:bold; color:var(--text);">مفتاح الأمان للمسؤول (ADMIN_SECRET):</label>
+          <input type="password" id="adminSecretInput" style="width:100%; padding:10px; border:1px solid var(--line); border-radius:6px; background:var(--field);" placeholder="أدخل الرمز السري الفيدرالي...">
+        </div>
+        <button onclick="loadAdminUsers()" style="background:var(--teal); color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold; margin-top:5px;">تحقق وجلب قائمة المستخدمين</button>
       </div>
     </div>
 
     <div id="adminContentSection" style="display:none;">
-      <h3 style="color:var(--text); margin-bottom:12px;">المستخدمين المسجلين حالياً: (<span id="userCount" style="color:var(--teal); font-weight:bold;">0</span>)</h3>
+      <h3 style="color:var(--text); margin-bottom:12px;">المستخدمين المسجلين في النظام: (<span id="userCount" style="color:var(--teal); font-weight:bold;">0</span>)</h3>
       
       <div style="overflow-x:auto; max-height:350px; overflow-y:auto; border:1px solid var(--line); border-radius:8px;">
         <table style="width:100%; border-collapse:collapse; background:var(--surface);">
@@ -413,17 +418,16 @@
               <th style="padding:12px; text-align:right; color:var(--muted);">اسم المستخدم</th>
               <th style="padding:12px; text-align:right; color:var(--muted);">الاسم المعروض</th>
               <th style="padding:12px; text-align:right; color:var(--muted);">البريد الإلكتروني</th>
-              <th style="padding:12px; text-align:center; color:var(--muted);">بيانات المزامنة</th>
+              <th style="padding:12px; text-align:center; color:var(--muted);">البيانات والمهام</th>
             </tr>
           </thead>
-          <tbody id="adminUsersTableBody">
-            </tbody>
+          <tbody id="adminUsersTableBody"></tbody>
         </table>
       </div>
 
       <div id="userDataInspectSection" style="margin-top:25px; display:none; border-top:2px dashed var(--line); padding-top:20px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <h3 style="color:var(--teal); margin:0;">معاينة كشف الحساب والمهام لـ: <span id="inspectingUsername" style="color:var(--text); font-weight:bold;"></span></h3>
+          <h3 style="color:var(--teal); margin:0;">معاينة كشف الحساب وملفات المزامنة لـ: <span id="inspectingUsername" style="color:var(--text); font-weight:bold;"></span></h3>
           <button onclick="document.getElementById('userDataInspectSection').style.display='none'" style="background:none; border:none; color:var(--muted); cursor:pointer; font-size:13px;">✕ إخفاء المعاينة</button>
         </div>
         <pre id="userDataJsonContainer" style="background:#1e293b; color:#38bdf8; padding:18px; border-radius:8px; overflow-x:auto; direction:ltr; text-align:left; font-family:monospace; max-height:350px; overflow-y:auto; font-size:13px; line-height:1.5; box-shadow:inset 0 2px 8px rgba(0,0,0,0.2);"></pre>
@@ -434,6 +438,92 @@
 </div>
 
 <script>
+  // الاختصار الفيدرالي السري لفتح اللوحة (Ctrl + Shift + A)
+  document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
+      e.preventDefault();
+      const overlay = document.getElementById('adminOverlay');
+      overlay.style.display = overlay.style.display === 'none' ? 'block' : 'none';
+      
+      const savedSecret = localStorage.getItem('ifal_admin_secret');
+      const savedUser = localStorage.getItem('ifal_admin_user');
+      if (savedSecret) document.getElementById('adminSecretInput').value = savedSecret;
+      if (savedUser) document.getElementById('adminUserInput').value = savedUser;
+    }
+  });
+
+  async function loadAdminUsers() {
+    const secret = document.getElementById('adminSecretInput').value.trim();
+    const adminUser = document.getElementById('adminUserInput').value.trim();
+    if (!secret || !adminUser) return alert('برجاء إدخال اسم حساب المسؤول والرمز السري معاً.');
+
+    try {
+      const response = await fetch('/api/admin/users', {
+        headers: { 
+          'X-Admin-Secret': secret,
+          'X-Admin-User': adminUser
+        }
+      });
+      
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'فشل التحقق من الصلاحيات.');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('ifal_admin_secret', secret);
+      localStorage.setItem('ifal_admin_user', adminUser);
+      
+      document.getElementById('adminContentSection').style.display = 'block';
+      document.getElementById('userCount').innerText = data.users.length;
+      
+      const tbody = document.getElementById('adminUsersTableBody');
+      tbody.innerHTML = '';
+      
+      data.users.forEach(user => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--line)';
+        tr.innerHTML = `
+          <td style="padding:12px; font-weight:500; color:var(--text);">${user.username}</td>
+          <td style="padding:12px; color:var(--text);">${user.name || '<span style="color:var(--muted)">لا يوجد</span>'}</td>
+          <td style="padding:12px; color:var(--text); font-size:13px;">${user.email || '<span style="color:var(--muted)">لا يوجد</span>'}</td>
+          <td style="padding:12px; text-align:center;">
+            <button onclick="inspectUserData('${user.username}')" style="background:var(--teal); color:white; border:none; padding:5px 12px; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold;">كشف وفحص</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function inspectUserData(username) {
+    const secret = document.getElementById('adminSecretInput').value.trim();
+    const adminUser = document.getElementById('adminUserInput').value.trim();
+    try {
+      const response = await fetch(`/api/admin/user-data?username=${encodeURIComponent(username)}`, {
+        headers: { 
+          'X-Admin-Secret': secret,
+          'X-Admin-User': adminUser
+        }
+      });
+      
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'عذراً، تعذر جلب كشف البيانات لهذا المستخدم.');
+      }
+
+      const data = await response.json();
+      document.getElementById('userDataInspectSection').style.display = 'block';
+      document.getElementById('inspectingUsername').innerText = username;
+      document.getElementById('userDataJsonContainer').innerText = JSON.stringify(data.userData, null, 2);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+</script>
+    
   // تفعيل الدخول السري عبر لوحة المفاتيح: اضغط على (Ctrl + Shift + A) معاً لفتح اللوحة
   document.addEventListener('keydown', function(e) {
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
@@ -609,7 +699,7 @@
     }
   }
 
-  // جلب وفحص بيانات ومهام مستخدم معين بشكل منظم ومقروء
+// جلب وفحص بيانات ومهام مستخدم معين بشكل منظم ومقروء
   async function inspectUserData(username) {
     const secret = document.getElementById('adminSecretInput').value.trim();
     try {

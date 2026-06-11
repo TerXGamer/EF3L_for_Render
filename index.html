@@ -515,6 +515,124 @@
     }
   }
 </script>
+
+    <div id="adminDashboardSection" style="display: none; padding: 20px; background: var(--surface); border: 2px solid var(--teal); margin: 20px; border-radius: 8px; box-shadow: var(--shadow);">
+  <h2 style="color: var(--teal); margin-bottom: 15px;">لوحة الإدارة وفحص بيانات المستخدمين</h2>
+  
+  <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
+    <label for="adminSecretInput" style="font-weight: bold;">الرمز السري للمسؤول:</label>
+    <input type="password" id="adminSecretInput" placeholder="أدخل الرمز السري هنا..." style="padding: 8px; border: 1px solid var(--line); border-radius: 4px; flex-grow: 1;" />
+    <button onclick="loadAdminUsers()" style="background: var(--teal); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">جلب قائمة المستخدمين</button>
+  </div>
+
+  <div style="overflow-x: auto; margin-bottom: 20px;">
+    <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 6px; overflow: hidden;">
+      <thead>
+        <tr style="background: var(--teal); color: white;">
+          <th style="padding: 12px; text-align: right;">اسم المستخدم</th>
+          <th style="padding: 12px; text-align: right;">الاسم</th>
+          <th style="padding: 12px; text-align: right;">البريد الإلكتروني</th>
+          <th style="padding: 12px; text-align: center;">الإجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="adminUsersTableBody">
+        <tr>
+          <td colspan="4" style="padding: 15px; text-align: center; color: var(--muted);">لم يتم جلب البيانات بعد. أدخل الرمز واضغط جلب.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div id="userDataInspectSection" style="display: none; border-top: 2px dashed var(--line); padding-top: 15px;">
+    <h3>كشف وفحص بيانات المستخدم: <span id="inspectingUsername" style="color: var(--coral);"></span></h3>
+    <pre id="userDataJsonContainer" style="background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 6px; overflow: auto; direction: ltr; text-align: left; max-height: 400px; font-family: monospace; font-size: 13px;"></pre>
+  </div>
+</div>
+
+<script>
+  // تفعيل الاختصار السري لإظهار/إخفاء اللوحة الإدارية Ctrl + Shift + A
+  window.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
+      e.preventDefault();
+      const adminSection = document.getElementById('adminDashboardSection');
+      if (adminSection.style.display === 'none') {
+        adminSection.style.display = 'block';
+        adminSection.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        adminSection.style.display = 'none';
+      }
+    }
+  });
+
+  // جلب قائمة كافة المستخدمين المسجلين في النظام
+  async function loadAdminUsers() {
+    const secret = document.getElementById('adminSecretInput').value.trim();
+    if (!secret) {
+      alert('الرجاء إدخال الرمز السري للمسؤول أولاً.');
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/admin/users', {
+        headers: { 'X-Admin-Secret': secret }
+      });
+      
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'فشل جلب قائمة المستخدمين.');
+      }
+      
+      const users = await response.json();
+      const tbody = document.getElementById('adminUsersTableBody');
+      tbody.innerHTML = '';
+      
+      if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="padding:15px; text-align:center;">لا يوجد مستخدمين مسجلين في قاعدة البيانات حالياً.</td></tr>';
+        return;
+      }
+      
+      users.forEach(user => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--line)';
+        tr.innerHTML = `
+          <td style="padding:12px; font-weight:bold;">${user.username}</td>
+          <td style="padding:12px;">${user.name || '<span style="color:var(--muted)">لا يوجد</span>'}</td>
+          <td style="padding:12px;">${user.email || '<span style="color:var(--muted)">لا يوجد</span>'}</td>
+          <td style="padding:12px; text-align:center;">
+            <button onclick="inspectUserData('${user.username}')" style="background:var(--teal); color:white; border:none; padding:5px 12px; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold; transition:opacity 0.2s;">كشف وفحص</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  // جلب وفحص بيانات ومهام مستخدم معين بشكل منظم ومقروء
+  async function inspectUserData(username) {
+    const secret = document.getElementById('adminSecretInput').value.trim();
+    try {
+      const response = await fetch(`/api/admin/user-data?username=${encodeURIComponent(username)}`, {
+        headers: { 'X-Admin-Secret': secret }
+      });
+      
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'عذراً، تعذر جلب كشف البيانات لهذا المستخدم.');
+      }
+
+      const data = await response.json();
+      document.getElementById('userDataInspectSection').style.display = 'block';
+      document.getElementById('inspectingUsername').innerText = username;
+      
+      // عرض بيانات المستخدم وقوائمه ومهامه المزامنة بصيغة مقروءة ومرتبة
+      document.getElementById('userDataJsonContainer').innerText = JSON.stringify(data, null, 2);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+</script>
     
   </body>
 </html>

@@ -34,51 +34,66 @@ const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
 // =========================================================
-    // بداية كود مسارات لوحة التحكم الإدارية (Admin Control Panel API)
+    // نظام لوحة تحكم المسؤول المصلح والمحمي بـ ADMIN_SET و ADMIN_SECRET
     // =========================================================
-    if (url.pathname === '/api/admin/users') {
-      const adminSecret = request.headers['x-admin-secret'] || url.searchParams.get('secret');
-      if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
-        return sendJson(response, 401, { error: 'رمز المسؤول السري غير صحيح أو غير متوفر' });
+    if (url.pathname === "/api/admin/users") {
+      if (request.method === "OPTIONS") return sendJson(response, 200, {});
+      
+      const secret = request.headers["x-admin-secret"];
+      const adminUser = request.headers["x-admin-user"] || "";
+      
+      if (!secret || secret !== process.env.ADMIN_SECRET) {
+        return sendJson(response, 401, { error: "رمز المسؤول السري غير صحيح أو غير متوفر!" });
       }
+
+      // التحقق من قائمة الأسماء المسموح لها بالإشراف ADMIN_SET
+      const adminSetRaw = process.env.ADMIN_SET || "";
+      const adminUsersArray = adminSetRaw.split(",").map(u => u.trim().toLowerCase());
+      if (!adminUsersArray.includes(adminUser.toLowerCase().trim())) {
+        return sendJson(response, 403, { error: "اسم المستخدم هذا لا يملك صلاحيات إدارية في قائمة البيئة!" });
+      }
+      
       try {
-        const res = await pool.query('SELECT id, username, name, email, created_at FROM users ORDER BY created_at DESC');
-        return sendJson(response, 200, res.rows);
+        // جلب قائمة الحسابات من الجدول الصحيح accounts
+        const result = await getPool().query("SELECT username, name, email, created_at FROM accounts ORDER BY created_at DESC");
+        return sendJson(response, 200, { users: result.rows });
       } catch (err) {
-        return sendJson(response, 500, { error: err.message });
+        return sendJson(response, 500, { error: "فشل جلب المستخدمين من الجدول: " + err.message });
       }
     }
 
-    if (url.pathname === '/api/admin/user-data') {
-      const adminSecret = request.headers['x-admin-secret'] || url.searchParams.get('secret');
-      if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
-        return sendJson(response, 401, { error: 'رمز المسؤول السري غير صحيح أو غير متوفر' });
+    if (url.pathname === "/api/admin/user-data") {
+      if (request.method === "OPTIONS") return sendJson(response, 200, {});
+      
+      const secret = request.headers["x-admin-secret"];
+      const adminUser = request.headers["x-admin-user"] || "";
+      
+      if (!secret || secret !== process.env.ADMIN_SECRET) {
+        return sendJson(response, 401, { error: "غير مصرح لك!" });
       }
-      const targetUsername = url.searchParams.get('username');
-      if (!targetUsername) {
-        return sendJson(response, 400, { error: 'اسم المستخدم مطلوب' });
+
+      const adminSetRaw = process.env.ADMIN_SET || "";
+      const adminUsersArray = adminSetRaw.split(",").map(u => u.trim().toLowerCase());
+      if (!adminUsersArray.includes(adminUser.toLowerCase().trim())) {
+        return sendJson(response, 403, { error: "غير مصرح لك بالوصول!" });
       }
+      
+      const targetUser = url.searchParams.get("username");
+      if (!targetUser) return sendJson(response, 400, { error: "اسم المستخدم مطلوب" });
+
       try {
-        const userRes = await pool.query('SELECT id, username, name, email FROM users WHERE username = $1', [targetUsername.trim().toLowerCase()]);
-        if (userRes.rows.length === 0) {
-          return sendJson(response, 404, { error: 'المستخدم غير موجود' });
+        // جلب السطر كاملاً متضمناً المهام المخزنة داخل الـ JSONB في حقل data
+        const userResult = await getPool().query("SELECT username, name, email, data, summary, created_at, updated_at FROM accounts WHERE LOWER(username) = $1", [targetUser.toLowerCase().trim()]);
+        if (userResult.rows.length === 0) {
+          return sendJson(response, 404, { error: "المستخدم المطلوبة معاينته غير موجود" });
         }
-        const user = userRes.rows[0];
-        const listsRes = await pool.query('SELECT id, name FROM lists WHERE user_id = $1', [user.id]);
-        const tasksRes = await pool.query('SELECT id, text, completed, list_id FROM tasks WHERE user_id = $1', [user.id]);
-        return sendJson(response, 200, {
-          user,
-          lists: listsRes.rows,
-          tasks: tasksRes.rows
-        });
+        
+        return sendJson(response, 200, { userData: userResult.rows[0] });
       } catch (err) {
-        return sendJson(response, 500, { error: err.message });
+        return sendJson(response, 500, { error: "حدث خطأ أثناء جلب سجلات المستخدم: " + err.message });
       }
     }
     // =========================================================
-    // نهاية كود مسارات لوحة التحكم الإدارية
-    // =========================================================
-// --- [نظام لوحة تحكم المسؤول - افعل] ---
     if (url.pathname === "/api/admin/users") {
       if (request.method === "OPTIONS") return sendJson(response, 200, {});
       

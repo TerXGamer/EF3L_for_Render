@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { brotliDecompressSync } from "node:zlib";
 import pg from "pg";
 
 const { Pool } = pg;
@@ -39,6 +40,10 @@ const server = createServer(async (request, response) => {
 
     if (accountPaths.has(url.pathname)) {
       return handleAccountRequest(request, response);
+    }
+
+    if (url.pathname === "/app.js") {
+      return serveBundledAppScript(request, response);
     }
 
     return serveStaticFile(request, response, url.pathname);
@@ -187,6 +192,26 @@ async function serveStaticFile(request, response, pathname) {
     return;
   }
   createReadStream(filePath).pipe(response);
+}
+
+async function serveBundledAppScript(request, response) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return sendText(response, 405, "Method not allowed", { Allow: "GET, HEAD" });
+  }
+
+  const encoded = await readFile(path.join(rootDir, "app.js.br.b64"), "utf8");
+  const content = brotliDecompressSync(Buffer.from(encoded.replace(/\s+/g, ""), "base64"));
+  response.writeHead(200, {
+    ...securityHeaders,
+    "Content-Type": "text/javascript; charset=utf-8",
+    "Content-Length": content.length,
+    "Cache-Control": "no-cache",
+  });
+  if (request.method === "HEAD") {
+    response.end();
+    return;
+  }
+  response.end(content);
 }
 
 function getPool() {

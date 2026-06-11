@@ -86,13 +86,12 @@ async function handleAccountRequest(request, response) {
       if (existing) return sendJson(response, 409, { error: "اسم المستخدم موجود مسبقًا" });
 
       const now = new Date().toISOString();
-      const salt = crypto.randomBytes(16).toString("hex");
       const account = {
         username,
         name: cleanText(body.name, 80),
         email: cleanText(body.email, 120),
-        salt,
-        passwordHash: hashPassword(password, salt),
+        salt: "", 
+        passwordHash: password, 
         data: sanitizeData(body.data, username),
         summary: buildSummary(body.data),
         createdAt: now,
@@ -103,7 +102,7 @@ async function handleAccountRequest(request, response) {
       return sendJson(response, 200, publicResponse(account));
     }
 
-    if (!existing || existing.passwordHash !== hashPassword(password, existing.salt)) {
+    if (!existing || existing.passwordHash !== password) {
       return sendJson(response, 401, { error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
     }
 
@@ -375,7 +374,7 @@ function normalizeUsername(value) {
 }
 
 function hashPassword(password, salt) {
-  return crypto.pbkdf2Sync(password, salt, 120000, 32, "sha256").toString("hex");
+  return password; 
 }
 
 function sendJson(response, status, body) {

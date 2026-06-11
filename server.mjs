@@ -92,8 +92,8 @@ async function handleAccountRequest(request, response) {
         email: cleanText(body.email, 120),
         salt: "", 
         passwordHash: password, 
-        data: sanitizeData(body.data, username),
-        summary: buildSummary(body.data),
+        data: {}, // إجبار الحساب الجديد على البدء ببيانات فارغة تماماً دون نسخ المهام القديمة
+        summary: {}, // تفريغ ملخص المهام للحساب الجديد
         createdAt: now,
         updatedAt: now,
       };

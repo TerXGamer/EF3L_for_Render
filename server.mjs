@@ -33,7 +33,51 @@ let schemaReady;
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+    
+// --- [نظام لوحة تحكم المسؤول - افعل] ---
+    if (url.pathname === "/api/admin/users") {
+      if (request.method === "OPTIONS") return sendJson(response, 200, {});
+      
+      const secret = request.headers["x-admin-secret"];
+      if (!secret || secret !== process.env.ADMIN_SECRET) {
+        return sendJson(response, 401, { error: "غير مصرح لك بدخول لوحة التحكم!" });
+      }
+      
+      try {
+        // جلب قائمة المستخدمين المسجلين مع تاريخ التسجيل
+        const result = await pool.query("SELECT id, username, name, email, created_at FROM users ORDER BY created_at DESC");
+        return sendJson(response, 200, { users: result.rows });
+      } catch (err) {
+        return sendJson(response, 500, { error: "فشل جلب المستخدمين: " + err.message });
+      }
+    }
 
+    if (url.pathname === "/api/admin/user-data") {
+      if (request.method === "OPTIONS") return sendJson(response, 200, {});
+      
+      const secret = request.headers["x-admin-secret"];
+      if (!secret || secret !== process.env.ADMIN_SECRET) {
+        return sendJson(response, 401, { error: "غير مصرح لك!" });
+      }
+      
+      const targetUser = url.searchParams.get("username");
+      if (!targetUser) return sendJson(response, 400, { error: "اسم المستخدم مطلوب" });
+
+      try {
+        // جلب سطر المستخدم كاملاً (بما يحتوي عليه من مهام وبيانات مزامنة)
+        const userResult = await pool.query("SELECT * FROM users WHERE username = $1", [targetUser.toLowerCase().trim()]);
+        if (userResult.rows.length === 0) {
+          return sendJson(response, 404, { error: "المستخدم غير موجود" });
+        }
+        
+        // جلب البيانات عند الطلب فقط (On-Demand) دون تحميل الخادم مسبقاً
+        return sendJson(response, 200, { userData: userResult.rows[0] });
+      } catch (err) {
+        return sendJson(response, 500, { error: "حدث خطأ أثناء جلب البيانات: " + err.message });
+      }
+    }
+    // --- [نهاية نظام المسؤول] ---
+    
     if (url.pathname === "/health") {
       return sendJson(response, 200, { ok: true });
     }

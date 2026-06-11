@@ -56,45 +56,104 @@ const server = createServer(async (request, response) => {
 server.listen(port, "0.0.0.0", async () => {
   console.log(`Ifal Render server listening on port ${port}`);
   
-  // نظام الصيانة السريع لحذف حسابات متعددة دفعة واحدة بفواصل (,)
+  // التأكد من تهيئة الاتصال بقاعدة البيانات أولاً لنظام الصيانة الشامل
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }
+    });
+  }
+
+  // [1] نظام الحذف السريع المشترك
   const usersToDeleteRaw = process.env.DELETE_ACCOUNT_NOW;
-  
   if (usersToDeleteRaw && usersToDeleteRaw.trim() !== "") {
     try {
-      // تقسيم النص بناءً على الفاصلة، تنظيف الفراغات، وتحويل الأحرف لصغيرة
-      const usernamesArray = usersToDeleteRaw
-        .split(",")
-        .map(u => u.trim().toLowerCase())
-        .filter(u => u !== "");
-      
-      if (usernamesArray.length > 0) {
-        if (!pool) {
-          pool = new Pool({
-            connectionString: process.env.DATABASE_URL,
-            ssl: { rejectUnauthorized: false }
-          });
-        }
-        
-        console.log(`[نظام الصيانة] جاري معالجة حذف دفعة مكونة من (${usernamesArray.length}) حسابات...`);
-        
-        // حلقة تكرارية للمرور على كل اسم وحذفه مع طباعة تقرير مفصل في الـ Logs
-        for (const username of usernamesArray) {
-          const result = await pool.query(
-            `DELETE FROM accounts WHERE username = $1;`,
-            [username]
-          );
-          
-          if (result.rowCount > 0) {
-            console.log(`[نظام الصيانة] نجاح: تم تدمير الحساب (${username}) وحذف جميع بياناته.`);
-          } else {
-            console.log(`[نظام الصيانة] تنبيه: الحساب (${username}) غير موجود في قاعدة البيانات أصلاً.`);
-          }
-        }
-        console.log(`[نظام الصيانة] اكتملت عملية تصفية الحسابات المطلوبة بنجاح!`);
+      const usernamesArray = usersToDeleteRaw.split(",").map(u => u.trim().toLowerCase()).filter(u => u !== "");
+      for (const username of usernamesArray) {
+        const result = await pool.query(`DELETE FROM accounts WHERE username = $1;`, [username]);
+        if (result.rowCount > 0) console.log(`[الصيانة - حذف] تم تدمير الحساب (${username}) بالكامل.`);
+        else console.log(`[الصيانة - حذف] تنبيه: الحساب (${username}) غير موجود.`);
       }
-    } catch (error) {
-      console.error("[نظام الصيانة] خطأ أثناء محاولة حذف الحسابات المتعددة:", error);
-    }
+    } catch (err) { console.error("[نظام الصيانة] خطأ في الحذف:", err); }
+  }
+
+  // [2] نظام تغيير كلمة المرور (CHANGE_PASSWORD) -> username:new_password
+  const changePasswordRaw = process.env.CHANGE_PASSWORD;
+  if (changePasswordRaw && changePasswordRaw.trim() !== "") {
+    try {
+      const pairs = changePasswordRaw.split(",").map(p => p.trim()).filter(p => p.includes(":"));
+      for (const pair of pairs) {
+        const idx = pair.indexOf(":");
+        const username = pair.substring(0, idx).trim().toLowerCase();
+        const newPassword = pair.substring(idx + 1).trim();
+        if (username && newPassword) {
+          const newSalt = crypto.randomBytes(16).toString("hex");
+          const newHash = hashPassword(newPassword, newSalt);
+          const result = await pool.query(`UPDATE accounts SET salt = $1, password_hash = $2 WHERE username = $3;`, [newSalt, newHash, username]);
+          if (result.rowCount > 0) console.log(`[الصيانة - كلمة المرور] نجاح: تم تحديث كلمة مرور الحساب (${username}).`);
+          else console.log(`[الصيانة - كلمة المرور] تنبيه: الحساب (${username}) غير موجود.`);
+        }
+      }
+    } catch (err) { console.error("[نظام الصيانة] خطأ في تغيير كلمة المرور:", err); }
+  }
+
+  // [3] نظام تغيير اسم المستخدم (CHANGE_USERNAME) -> old_username:new_username
+  const changeUsernameRaw = process.env.CHANGE_USERNAME;
+  if (changeUsernameRaw && changeUsernameRaw.trim() !== "") {
+    try {
+      const pairs = changeUsernameRaw.split(",").map(p => p.trim()).filter(p => p.includes(":"));
+      for (const pair of pairs) {
+        const idx = pair.indexOf(":");
+        const oldUsername = pair.substring(0, idx).trim().toLowerCase();
+        const newUsername = pair.substring(idx + 1).trim().toLowerCase();
+        if (oldUsername && newUsername) {
+          const check = await pool.query(`SELECT username FROM accounts WHERE username = $1;`, [newUsername]);
+          if (check.rowCount > 0) {
+            console.log(`[الصيانة - اسم المستخدم] خطأ: الاسم الجديد (${newUsername}) محجوز مسبقاً لحساب آخر.`);
+            continue;
+          }
+          const result = await pool.query(`UPDATE accounts SET username = $1 WHERE username = $2;`, [newUsername, oldUsername]);
+          if (result.rowCount > 0) console.log(`[الصيانة - اسم المستخدم] نجاح: تم التعديل من (${oldUsername}) إلى (${newUsername}). البيانات والمهام محفوظة كما هي.`);
+          else console.log(`[الصيانة - اسم المستخدم] تنبيه: الحساب القديم (${oldUsername}) غير موجود.`);
+        }
+      }
+    } catch (err) { console.error("[نظام الصيانة] خطأ في تغيير اسم المستخدم:", err); }
+  }
+
+  // [4] نظام تغيير الاسم العادي للمستخدم (CHANGE_NAME) -> username:new_name
+  const changeNameRaw = process.env.CHANGE_NAME;
+  if (changeNameRaw && changeNameRaw.trim() !== "") {
+    try {
+      const pairs = changeNameRaw.split(",").map(p => p.trim()).filter(p => p.includes(":"));
+      for (const pair of pairs) {
+        const idx = pair.indexOf(":");
+        const username = pair.substring(0, idx).trim().toLowerCase();
+        const newName = pair.substring(idx + 1).trim();
+        if (username && newName) {
+          const result = await pool.query(`UPDATE accounts SET name = $1 WHERE username = $2;`, [newName, username]);
+          if (result.rowCount > 0) console.log(`[الصيانة - الاسم العادي] نجاح: تم تغيير اسم الحساب (${username}) إلى (${newName}).`);
+          else console.log(`[الصيانة - الاسم العادي] تنبيه: الحساب (${username}) غير موجود.`);
+        }
+      }
+    } catch (err) { console.error("[نظام الصيانة] خطأ في تغيير الاسم العادي:", err); }
+  }
+
+  // [5] نظام تغيير البريد الإلكتروني (CHANGE_EMAIL) -> username:new_email
+  const changeEmailRaw = process.env.CHANGE_EMAIL;
+  if (changeEmailRaw && changeEmailRaw.trim() !== "") {
+    try {
+      const pairs = changeEmailRaw.split(",").map(p => p.trim()).filter(p => p.includes(":"));
+      for (const pair of pairs) {
+        const idx = pair.indexOf(":");
+        const username = pair.substring(0, idx).trim().toLowerCase();
+        const newEmail = pair.substring(idx + 1).trim();
+        if (username && newEmail) {
+          const result = await pool.query(`UPDATE accounts SET email = $1 WHERE username = $2;`, [newEmail, username]);
+          if (result.rowCount > 0) console.log(`[الصيانة - البريد] نجاح: تم تحديث بريد الحساب (${username}) إلى (${newEmail}).`);
+          else console.log(`[الصيانة - البريد] تنبيه: الحساب (${username}) غير موجود.`);
+        }
+      }
+    } catch (err) { console.error("[نظام الصيانة] خطأ في تغيير البريد الإلكتروني:", err); }
   }
 });
 

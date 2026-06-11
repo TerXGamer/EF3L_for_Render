@@ -33,110 +33,7 @@ let schemaReady;
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
-// =========================================================
-    // نظام لوحة تحكم المسؤول المصلح والمحمي بـ ADMIN_SET و ADMIN_SECRET
-    // =========================================================
-    if (url.pathname === "/api/admin/users") {
-      if (request.method === "OPTIONS") return sendJson(response, 200, {});
-      
-      const secret = request.headers["x-admin-secret"];
-      const adminUser = request.headers["x-admin-user"] || "";
-      
-      if (!secret || secret !== process.env.ADMIN_SECRET) {
-        return sendJson(response, 401, { error: "رمز المسؤول السري غير صحيح أو غير متوفر!" });
-      }
 
-      // التحقق من قائمة الأسماء المسموح لها بالإشراف ADMIN_SET
-      const adminSetRaw = process.env.ADMIN_SET || "";
-      const adminUsersArray = adminSetRaw.split(",").map(u => u.trim().toLowerCase());
-      if (!adminUsersArray.includes(adminUser.toLowerCase().trim())) {
-        return sendJson(response, 403, { error: "اسم المستخدم هذا لا يملك صلاحيات إدارية في قائمة البيئة!" });
-      }
-      
-      try {
-        // جلب قائمة الحسابات من الجدول الصحيح accounts
-        const result = await getPool().query("SELECT username, name, email, created_at FROM accounts ORDER BY created_at DESC");
-        return sendJson(response, 200, { users: result.rows });
-      } catch (err) {
-        return sendJson(response, 500, { error: "فشل جلب المستخدمين من الجدول: " + err.message });
-      }
-    }
-
-    if (url.pathname === "/api/admin/user-data") {
-      if (request.method === "OPTIONS") return sendJson(response, 200, {});
-      
-      const secret = request.headers["x-admin-secret"];
-      const adminUser = request.headers["x-admin-user"] || "";
-      
-      if (!secret || secret !== process.env.ADMIN_SECRET) {
-        return sendJson(response, 401, { error: "غير مصرح لك!" });
-      }
-
-      const adminSetRaw = process.env.ADMIN_SET || "";
-      const adminUsersArray = adminSetRaw.split(",").map(u => u.trim().toLowerCase());
-      if (!adminUsersArray.includes(adminUser.toLowerCase().trim())) {
-        return sendJson(response, 403, { error: "غير مصرح لك بالوصول!" });
-      }
-      
-      const targetUser = url.searchParams.get("username");
-      if (!targetUser) return sendJson(response, 400, { error: "اسم المستخدم مطلوب" });
-
-      try {
-        // جلب السطر كاملاً متضمناً المهام المخزنة داخل الـ JSONB في حقل data
-        const userResult = await getPool().query("SELECT username, name, email, data, summary, created_at, updated_at FROM accounts WHERE LOWER(username) = $1", [targetUser.toLowerCase().trim()]);
-        if (userResult.rows.length === 0) {
-          return sendJson(response, 404, { error: "المستخدم المطلوبة معاينته غير موجود" });
-        }
-        
-        return sendJson(response, 200, { userData: userResult.rows[0] });
-      } catch (err) {
-        return sendJson(response, 500, { error: "حدث خطأ أثناء جلب سجلات المستخدم: " + err.message });
-      }
-    }
-    // =========================================================
-    if (url.pathname === "/api/admin/users") {
-      if (request.method === "OPTIONS") return sendJson(response, 200, {});
-      
-      const secret = request.headers["x-admin-secret"];
-      if (!secret || secret !== process.env.ADMIN_SECRET) {
-        return sendJson(response, 401, { error: "غير مصرح لك بدخول لوحة التحكم!" });
-      }
-      
-      try {
-        // جلب قائمة المستخدمين المسجلين مع تاريخ التسجيل
-        const result = await pool.query("SELECT id, username, name, email, created_at FROM users ORDER BY created_at DESC");
-        return sendJson(response, 200, { users: result.rows });
-      } catch (err) {
-        return sendJson(response, 500, { error: "فشل جلب المستخدمين: " + err.message });
-      }
-    }
-
-    if (url.pathname === "/api/admin/user-data") {
-      if (request.method === "OPTIONS") return sendJson(response, 200, {});
-      
-      const secret = request.headers["x-admin-secret"];
-      if (!secret || secret !== process.env.ADMIN_SECRET) {
-        return sendJson(response, 401, { error: "غير مصرح لك!" });
-      }
-      
-      const targetUser = url.searchParams.get("username");
-      if (!targetUser) return sendJson(response, 400, { error: "اسم المستخدم مطلوب" });
-
-      try {
-        // جلب سطر المستخدم كاملاً (بما يحتوي عليه من مهام وبيانات مزامنة)
-        const userResult = await pool.query("SELECT * FROM users WHERE username = $1", [targetUser.toLowerCase().trim()]);
-        if (userResult.rows.length === 0) {
-          return sendJson(response, 404, { error: "المستخدم غير موجود" });
-        }
-        
-        // جلب البيانات عند الطلب فقط (On-Demand) دون تحميل الخادم مسبقاً
-        return sendJson(response, 200, { userData: userResult.rows[0] });
-      } catch (err) {
-        return sendJson(response, 500, { error: "حدث خطأ أثناء جلب البيانات: " + err.message });
-      }
-    }
-    // --- [نهاية نظام المسؤول] ---
-    
     if (url.pathname === "/health") {
       return sendJson(response, 200, { ok: true });
     }
@@ -577,8 +474,7 @@ function normalizeUsername(value) {
 }
 
 function hashPassword(password, salt) {
-  // تشفير كلمة المرور وتحويلها إلى نص مشفر آمن لحماية الحسابات
-  return crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+  return password; 
 }
 
 function sendJson(response, status, body) {

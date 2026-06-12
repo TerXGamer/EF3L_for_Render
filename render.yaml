@@ -16,6 +16,8 @@ services:
         fromDatabase:
           name: ifal-render-db
           property: connectionString
+      - key: ADMIN_SET
+        sync: false
 
 databases:
   - name: ifal-render-db

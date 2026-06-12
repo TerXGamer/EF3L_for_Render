@@ -383,6 +383,51 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        let syncTimeout;
+        
+        // دالة تفعيل المزامنة التلقائية خلف الكواليس
+        function triggerAutoSync() {
+          clearTimeout(syncTimeout);
+          // تأخير بمقدار ثانية واحدة لضمان اكتمال الحفظ في ذاكرة المتصفح أولاً ثم رفعها للسيرفر
+          syncTimeout = setTimeout(() => {
+            const mobileSync = document.getElementById("syncNow");
+            const desktopSync = document.getElementById("manualCloudSync");
+            
+            if (mobileSync) mobileSync.click();
+            if (desktopSync) desktopSync.click();
+            console.log("[نظام افعل] تم إجراء مزامنة تلقائية للبيانات مع خادم Render.");
+          }, 1000);
+        }
+
+        // 1. المزامنة عند إرسال أي نموذج أو حفظ مهمة جديدة
+        document.addEventListener("submit", () => triggerAutoSync());
+
+        // 2. المزامنة عند النقر على أي عناصر تفاعلية (إتمام مهمة، حذف، اختيار أهمية)
+        document.addEventListener("click", (e) => {
+          const target = e.target;
+          if (
+            target.closest(".task-list") || 
+            target.closest(".segmented") || 
+            target.closest(".button-row") || 
+            target.closest(".danger-zone") || 
+            target.type === "checkbox"
+          ) {
+            triggerAutoSync();
+          }
+        });
+
+        // 3. المزامنة عند تغيير خيارات القوائم المنسدلة أو أشكال الموقع
+        document.addEventListener("change", (e) => {
+          if (e.target.tagName === "SELECT" || e.target.type === "checkbox") {
+            triggerAutoSync();
+          }
+        });
+      });
+    </script>
+    
     <script src="app.js?v=20260610-13"></script>
   </body>
 </html>

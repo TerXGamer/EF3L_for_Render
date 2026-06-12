@@ -62,6 +62,7 @@
             <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button" data-view="account" type="button">حسابي</button>
             <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
           </div>
           <div class="settings-layout">
             <form class="form-panel" id="taskForm">
@@ -252,6 +253,7 @@
             <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button" data-view="account" type="button">حسابي</button>
             <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
           </div>
           <div class="summary-grid" id="statsSummary"></div>
           <div class="stats-layout">
@@ -291,6 +293,7 @@
             <button class="subnav-button active" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button" data-view="account" type="button">حسابي</button>
             <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
           </div>
           <section class="plain-panel">
             <div class="section-head"><h3>المظهر</h3><span></span></div>
@@ -313,6 +316,7 @@
             <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button active" data-view="account" type="button">حسابي</button>
             <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
           </div>
           <div class="account-grid">
             <section class="plain-panel">
@@ -331,6 +335,43 @@
           </div>
         </section>
 
+        <section class="view" id="view-admin" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="settings">
+            <button class="subnav-button" data-view="settings" type="button">إعدادات المهام</button>
+            <button class="subnav-button" data-view="stats" type="button">الإحصائيات</button>
+            <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
+            <button class="subnav-button" data-view="account" type="button">حسابي</button>
+            <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only active" data-view="admin" type="button" hidden>الادمن</button>
+          </div>
+          <section class="plain-panel">
+            <div class="section-head">
+              <h3>مستخدمي الموقع</h3>
+              <span id="adminUserCount"></span>
+            </div>
+            <div class="account-list compact-list" id="adminUserList"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-adminReveal" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="settings">
+            <button class="subnav-button" data-view="settings" type="button">إعدادات المهام</button>
+            <button class="subnav-button" data-view="stats" type="button">الإحصائيات</button>
+            <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
+            <button class="subnav-button" data-view="account" type="button">حسابي</button>
+            <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+          </div>
+          <section class="plain-panel">
+            <div class="section-head">
+              <h3 id="adminRevealTitle">كشف</h3>
+              <button class="ghost-button" id="adminRevealBack" type="button">رجوع</button>
+            </div>
+            <div class="admin-profile-grid" id="adminRevealProfile"></div>
+            <div class="admin-task-log" id="adminRevealTasks"></div>
+          </section>
+        </section>
+
         <section class="view" id="view-reset" aria-labelledby="viewTitle">
           <div class="subnav" data-group="settings">
             <button class="subnav-button" data-view="settings" type="button">إعدادات المهام</button>
@@ -338,6 +379,7 @@
             <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button" data-view="account" type="button">حسابي</button>
             <button class="subnav-button active" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
           </div>
           <section class="plain-panel danger-zone">
             <div class="section-head"><h3>إعادة الضبط</h3><span></span></div>

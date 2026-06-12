@@ -386,40 +386,70 @@
 
     <script>
       document.addEventListener("DOMContentLoaded", () => {
-        let syncTimeout;
         const toastEl = document.getElementById("toast");
 
-        // 1. مراقب ذكي لمنع ظهور إشعارات المزامنة المزعجة نهائياً
+        // 1. إلغاء ومحو مظهر الإشعار الفاضي أو إشعارات المزامنة نهائياً من الشاشة
         if (toastEl) {
-          const observer = new MutationObserver(() => {
+          const cleanToast = () => {
             const text = toastEl.textContent || "";
-            // إذا كان الإشعار يحتوي على كلمات المزامنة، يتم تصفيره وإخفاؤه فوراً خلف الكواليس
-            if (text.includes("مزامنة") || text.includes("المزامنة") || text.includes("تحديث") || text.includes("رندر")) {
-              toastEl.style.setProperty("display", "none", "important");
-              setTimeout(() => {
-                toastEl.textContent = "";
-                toastEl.style.removeProperty("display");
-              }, 50);
+            // إذا كان الإشعار فارغاً أو يحتوي على كلمات تخص المزامنة والتحديث، يتم إخفاء المربع كلياً
+            if (
+              text === "" || 
+              text.includes("مزامنة") || 
+              text.includes("المزامنة") || 
+              text.includes("تحديث") || 
+              text.includes("رندر") || 
+              text.includes("نجاح")
+            ) {
+              // طمس كل الخصائص البصرية للمربع لكي لا يظهر حتى كمربع فاضي
+              toastEl.style.setProperty("opacity", "0", "important");
+              toastEl.style.setProperty("visibility", "hidden", "important");
+              toastEl.style.setProperty("pointer-events", "none", "important");
+              toastEl.style.setProperty("transform", "scale(0)", "important");
+              toastEl.style.setProperty("padding", "0", "important");
+              toastEl.style.setProperty("margin", "0", "important");
+              toastEl.style.setProperty("border", "none", "important");
+              toastEl.style.setProperty("background", "transparent", "important");
+              toastEl.style.setProperty("box-shadow", "none", "important");
+            } else {
+              // إذا كان إشعاراً هاماً آخر (مثل خطأ في كلمة المرور)، يظهر بشكل طبيعي
+              toastEl.style.removeProperty("opacity");
+              toastEl.style.removeProperty("visibility");
+              toastEl.style.removeProperty("pointer-events");
+              toastEl.style.removeProperty("transform");
+              toastEl.style.removeProperty("padding");
+              toastEl.style.removeProperty("margin");
+              toastEl.style.removeProperty("border");
+              toastEl.style.removeProperty("background");
+              toastEl.style.removeProperty("box-shadow");
             }
-          });
-          observer.observe(toastEl, { childList: true, subtree: true });
+          };
+
+          // مراقبة أي تغيير في النص أو كلاسات التوست لإخفائه فوراً
+          const observer = new MutationObserver(cleanToast);
+          observer.observe(toastEl, { childList: true, subtree: true, attributes: true });
         }
         
-        // 2. دالة المزامنة الذكية (تنتظر 4 ثوانٍ من الخمول التام قبل رفع البيانات لـ Render)
-        function triggerAutoSync() {
-          clearTimeout(syncTimeout);
-          syncTimeout = setTimeout(() => {
-            const mobileSync = document.getElementById("syncNow");
-            const desktopSync = document.getElementById("manualCloudSync");
-            
-            if (mobileSync) mobileSync.click();
-            if (desktopSync) desktopSync.click();
-            console.log("[نظام افعل] تمت المزامنة التلقائية الصامتة بنجاح وحماية السيرفر.");
-          }, 4000); // 4000 مللي ثانية = 4 ثوانٍ خمول
+        let syncTimeout;
+        // دالة تنفيذ المزامنة الفعلية عبر الأزرار المخفية
+        function executeSync() {
+          const mobileSync = document.getElementById("syncNow");
+          const desktopSync = document.getElementById("manualCloudSync");
+          
+          if (mobileSync) mobileSync.click();
+          if (desktopSync) desktopSync.click();
+          console.log("[نظام افعل] تمت المزامنة الخلفية الصامتة.");
         }
 
-        // مراقبة العمليات الأساسية لتشغيل المزامنة
-        document.addEventListener("submit", () => triggerAutoSync());
+        // دالة المزامنة الفورية عند حدوث أي إجراء (أكشن)
+        function triggerImmediateSync() {
+          clearTimeout(syncTimeout);
+          // تأخير بسيط جداً (500 مللي ثانية) لضمان حفظ التعديل في المتصفح أولاً ثم رفعه فوراً
+          syncTimeout = setTimeout(executeSync, 500);
+        }
+
+        // أولاً: المزامنة الفورية عند حدوث أي تعديل (حفظ، إضافة، حذف، نقل، تغيير قائمة)
+        document.addEventListener("submit", () => triggerImmediateSync());
 
         document.addEventListener("click", (e) => {
           const target = e.target;
@@ -428,17 +458,22 @@
             target.closest(".segmented") || 
             target.closest(".button-row") || 
             target.closest(".danger-zone") || 
-            target.type === "checkbox"
+            target.type === "checkbox" ||
+            target.id === "loginSubmit" ||
+            target.id === "logoutButton"
           ) {
-            triggerAutoSync();
+            triggerImmediateSync();
           }
         });
 
         document.addEventListener("change", (e) => {
-          if (e.target.tagName === "SELECT" || e.target.type === "checkbox") {
-            triggerAutoSync();
+          if (e.target.tagName === "SELECT" || e.target.type === "checkbox" || e.target.tagName === "INPUT") {
+            triggerImmediateSync();
           }
         });
+
+        // ثانياً: المزامنة الدورية التلقائية كل 10 ثوانٍ كاحتياط لضمان حفظ كل شيء دائمًا
+        setInterval(executeSync, 10000);
       });
     </script>
     

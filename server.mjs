@@ -11,6 +11,7 @@ const { Pool } = pg;
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT || 3000);
 const accountPaths = new Set(["/api/account", "/.netlify/functions/account"]);
+const adminPaths = new Set(["/api/admin"]);
 const maxBodyBytes = 8 * 1024 * 1024;
 
 const jsonHeaders = {
@@ -40,6 +41,10 @@ const server = createServer(async (request, response) => {
 
     if (accountPaths.has(url.pathname)) {
       return handleAccountRequest(request, response);
+    }
+
+    if (adminPaths.has(url.pathname)) {
+      return handleAdminRequest(request, response);
     }
 
     if (url.pathname === "/app.js") {
@@ -156,6 +161,167 @@ server.listen(port, "0.0.0.0", async () => {
     } catch (err) { console.error("[نظام الصيانة] خطأ في تغيير البريد الإلكتروني:", err); }
   }
 });
+
+function parseAdminSet() {
+  const raw = process.env.ADMIN_SET || "";
+  return raw
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isAdminUser(username) {
+  return parseAdminSet().includes(normalizeUsername(username));
+}
+
+function currentMonthRange() {
+  const now = new Date();
+  const monthStart = todayISO(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)));
+  const monthEnd = todayISO(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)));
+  const monthLabel = new Intl.DateTimeFormat("ar", { month: "long", year: "numeric", timeZone: "UTC" }).format(
+    new Date(`${monthStart}T12:00:00Z`),
+  );
+  return { monthStart, monthEnd, monthLabel };
+}
+
+function todayISO(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+async function authenticateAccount(username, password) {
+  const existing = await readAccount(username);
+  if (!existing || existing.passwordHash !== password) return null;
+  return existing;
+}
+
+async function requireAdminAccess(username, password) {
+  if (!isAdminUser(username)) {
+    return { error: "غير مصرح", status: 403 };
+  }
+  const account = await authenticateAccount(username, password);
+  if (!account) {
+    return { error: "اسم المستخدم أو كلمة المرور غير صحيحة", status: 401 };
+  }
+  return { account };
+}
+
+async function handleAdminRequest(request, response) {
+  if (request.method === "OPTIONS") {
+    response.writeHead(204, jsonHeaders);
+    response.end();
+    return;
+  }
+
+  if (request.method !== "POST") {
+    return sendJson(response, 405, { error: "Method not allowed" });
+  }
+
+  try {
+    await ensureSchema();
+
+    const body = await readJsonBody(request);
+    const action = body.action;
+    const username = normalizeUsername(body.username);
+    const password = String(body.password || "");
+
+    if (!username || !password) {
+      return sendJson(response, 400, { error: "اسم المستخدم وكلمة المرور مطلوبة" });
+    }
+
+    const access = await requireAdminAccess(username, password);
+    if (access.error) {
+      return sendJson(response, access.status, { error: access.error });
+    }
+
+    if (action === "check") {
+      return sendJson(response, 200, { isAdmin: true });
+    }
+
+    if (action === "list") {
+      const result = await getPool().query(
+        `SELECT username FROM accounts ORDER BY LOWER(username) ASC`,
+      );
+      return sendJson(response, 200, {
+        users: result.rows.map((row) => row.username),
+      });
+    }
+
+    if (action === "reveal") {
+      const targetUsername = normalizeUsername(body.targetUsername);
+      if (!targetUsername) {
+        return sendJson(response, 400, { error: "اسم المستخدم المطلوب كشفه غير صالح" });
+      }
+
+      const target = await readAccount(targetUsername);
+      if (!target) {
+        return sendJson(response, 404, { error: "المستخدم غير موجود" });
+      }
+
+      const { monthStart, monthEnd, monthLabel } = currentMonthRange();
+      const report = buildAdminRevealReport(target, monthStart, monthEnd, monthLabel);
+      return sendJson(response, 200, report);
+    }
+
+    return sendJson(response, 400, { error: "طلب غير معروف" });
+  } catch (error) {
+    console.error("Admin API error", error);
+    return sendJson(response, 500, {
+      error: "حدث خطأ في خادم Render",
+      details: cleanText(error?.message || error?.name || "unknown", 240),
+    });
+  }
+}
+
+function buildAdminRevealReport(account, monthStart, monthEnd, monthLabel) {
+  const data = account.data && typeof account.data === "object" ? account.data : {};
+  const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+  const instances = data.instances && typeof data.instances === "object" ? Object.values(data.instances) : [];
+  const monthInstances = instances.filter((item) => item?.date && item.date >= monthStart && item.date <= monthEnd);
+  const lastLogin = cleanText(data?.user?.loggedInAt || "", 40) || null;
+
+  const taskReports = tasks.map((task) => {
+    const taskInstances = monthInstances.filter((item) => item.taskId === task.id);
+    const completedInstances = taskInstances.filter((item) => item.status === "completed");
+    const sortedByDate = taskInstances.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const sortedByCompletion = completedInstances
+      .slice()
+      .sort((a, b) => String(b.completedAt || b.updatedAt || "").localeCompare(String(a.completedAt || a.updatedAt || "")));
+
+    const lastAppearanceInstance = sortedByDate[0] || null;
+    const lastCompletedInstance = sortedByCompletion[0] || null;
+
+    return {
+      id: task.id,
+      title: cleanText(task.title, 120),
+      active: task.active !== false,
+      createdAt: task.createdAt || null,
+      appearanceFrom: task.time || null,
+      appearanceTo: task.endTime || null,
+      lastLogin,
+      lastAppearance: lastAppearanceInstance?.date || null,
+      lastCompletion: lastCompletedInstance?.completedAt || lastCompletedInstance?.updatedAt || null,
+      completionCount: completedInstances.length,
+      monthRecords: taskInstances.length,
+    };
+  });
+
+  return {
+    user: {
+      username: account.username,
+      name: account.name,
+      email: account.email,
+      createdAt: account.createdAt,
+      updatedAt: account.updatedAt,
+      lastLogin,
+    },
+    month: {
+      start: monthStart,
+      end: monthEnd,
+      label: monthLabel,
+    },
+    tasks: taskReports,
+  };
+}
 
 async function handleAccountRequest(request, response) {
   if (request.method === "OPTIONS") {

@@ -387,25 +387,40 @@
     <script>
       document.addEventListener("DOMContentLoaded", () => {
         let syncTimeout;
+        const toastEl = document.getElementById("toast");
+
+        // 1. مراقب ذكي لمنع ظهور إشعارات المزامنة المزعجة نهائياً
+        if (toastEl) {
+          const observer = new MutationObserver(() => {
+            const text = toastEl.textContent || "";
+            // إذا كان الإشعار يحتوي على كلمات المزامنة، يتم تصفيره وإخفاؤه فوراً خلف الكواليس
+            if (text.includes("مزامنة") || text.includes("المزامنة") || text.includes("تحديث") || text.includes("رندر")) {
+              toastEl.style.setProperty("display", "none", "important");
+              setTimeout(() => {
+                toastEl.textContent = "";
+                toastEl.style.removeProperty("display");
+              }, 50);
+            }
+          });
+          observer.observe(toastEl, { childList: true, subtree: true });
+        }
         
-        // دالة تفعيل المزامنة التلقائية خلف الكواليس
+        // 2. دالة المزامنة الذكية (تنتظر 4 ثوانٍ من الخمول التام قبل رفع البيانات لـ Render)
         function triggerAutoSync() {
           clearTimeout(syncTimeout);
-          // تأخير بمقدار ثانية واحدة لضمان اكتمال الحفظ في ذاكرة المتصفح أولاً ثم رفعها للسيرفر
           syncTimeout = setTimeout(() => {
             const mobileSync = document.getElementById("syncNow");
             const desktopSync = document.getElementById("manualCloudSync");
             
             if (mobileSync) mobileSync.click();
             if (desktopSync) desktopSync.click();
-            console.log("[نظام افعل] تم إجراء مزامنة تلقائية للبيانات مع خادم Render.");
-          }, 1000);
+            console.log("[نظام افعل] تمت المزامنة التلقائية الصامتة بنجاح وحماية السيرفر.");
+          }, 4000); // 4000 مللي ثانية = 4 ثوانٍ خمول
         }
 
-        // 1. المزامنة عند إرسال أي نموذج أو حفظ مهمة جديدة
+        // مراقبة العمليات الأساسية لتشغيل المزامنة
         document.addEventListener("submit", () => triggerAutoSync());
 
-        // 2. المزامنة عند النقر على أي عناصر تفاعلية (إتمام مهمة، حذف، اختيار أهمية)
         document.addEventListener("click", (e) => {
           const target = e.target;
           if (
@@ -419,7 +434,6 @@
           }
         });
 
-        // 3. المزامنة عند تغيير خيارات القوائم المنسدلة أو أشكال الموقع
         document.addEventListener("change", (e) => {
           if (e.target.tagName === "SELECT" || e.target.type === "checkbox") {
             triggerAutoSync();

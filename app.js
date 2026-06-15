@@ -1771,17 +1771,15 @@ function renderDependencyOptions() {
   el.taskDependency.disabled = availableTasks.length === 0;
   if (el.dependencyHint) {
     el.dependencyHint.textContent = availableTasks.length
-      ? "تظهر هنا فقط المهام الموجودة في القائمة الرئيسية الآن."
-      : "لا توجد مهام رئيسية متاحة للربط الآن.";
+      ? "تظهر هنا جميع المهام المتاحة للربط."
+      : "لا توجد مهام متاحة للربط حالياً.";
   }
 }
 
 function availableDependencyTasks(currentTaskId) {
-  const today = todayISO();
   return state.tasks.filter((task) => {
-    if (task.id === currentTaskId || !task.active) return false;
-    const instance = state.instances[instanceId(task.id, today)];
-    return Boolean(instance && instance.status === "main");
+    // إظهار كل المهمات النشطة عدا المهمة الحالية نفسها لمنع الربط الدائري
+    return task.id !== currentTaskId && task.active;
   });
 }
 

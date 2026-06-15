@@ -495,6 +495,10 @@
 
         document.addEventListener("click", (e) => {
           const target = e.target;
+          
+          // سطر الحماية: منع الدخول في لوب لانهائي عند الضغط البرمجي التلقائي على أزرار المزامنة
+          if (target.id === "syncNow" || target.id === "manualCloudSync") return;
+
           if (
             target.closest(".task-list") || 
             target.closest(".segmented") || 

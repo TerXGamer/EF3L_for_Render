@@ -2021,6 +2021,219 @@ function compareText(current, previous) {
   return "بدون تغيير";
 }
 
+// ==========================================
+// برمجية إضافة صفحة الإحصائيات المدققة تلقائياً
+// ==========================================
+document.addEventListener("DOMContentLoaded", () => {
+  const btnNav = document.getElementById("btnDetailedStatsNav");
+  const detailedView = document.getElementById("detailedStatsView");
+  const btnBack = document.getElementById("btnDetailedStatsBack");
+  const taskSelect = document.getElementById("detailedTaskSelect");
+  const singleStatsResult = document.getElementById("singleTaskStatsResult");
+  const btnShowAll = document.getElementById("btnShowAllSummary");
+  const allSummaryResult = document.getElementById("allTasksSummaryResult");
+
+  if (!btnNav || !detailedView) return;
+
+  // فتح صفحة الإحصائيات المدققة وإخفاء الواجهات الأخرى مؤقتاً لعدم حدوث تضارب
+  btnNav.addEventListener("click", () => {
+    const contentChildren = document.querySelectorAll(".content > *:not(#detailedStatsView):not(.mobile-brandbar)");
+    contentChildren.forEach(el => el.style.display = "none");
+    
+    // إزالة التحديد النشط من الأزرار الأخرى في القائمة وإضافته لزرنا المخصص
+    document.querySelectorAll(".nav-button").forEach(b => b.classList.remove("active"));
+    btnNav.classList.add("active");
+
+    detailedView.style.display = "block";
+    loadTasksIntoDropdown();
+  });
+
+  // العودة للوضع الطبيعي عند الضغط على زر رجوع
+  btnBack.addEventListener("click", () => {
+    detailedView.style.display = "none";
+    btnNav.classList.remove("active");
+    // محاكاة الضغط على التبويب الرئيسي لإعادة تشغيل الموقع بالشكل القياسي الآمن
+    const mainNavBtn = document.querySelector('.nav-button[data-view="main"]');
+    if (mainNavBtn) {
+      mainNavBtn.click();
+    } else {
+      window.location.reload(); // حل احتياطي آمن جداً
+    }
+  });
+
+  // دالة قراءة المهام من الذاكرة المحلية وتعبئة خيارات الانتقاء
+  function loadTasksIntoDropdown() {
+    taskSelect.innerHTML = '<option value="">-- اضغط هنا لاختيار المهمة --</option>';
+    const storeData = JSON.parse(localStorage.getItem("ifal.task.manager.v1") || "{}");
+    let tasks = storeData.tasks || [];
+    if (Array.isArray(storeData)) tasks = storeData;
+
+    tasks.forEach(task => {
+      if (!task) return;
+      const title = task.title || task.text || task.name || "مهمة غير مسمية";
+      const option = document.createElement("option");
+      option.value = task.id;
+      option.textContent = title;
+      taskSelect.appendChild(option);
+    });
+  }
+
+  // عند اختيار مهمة معينة من القائمة
+  taskSelect.addEventListener("change", () => {
+    const taskId = taskSelect.value;
+    if (!taskId) {
+      singleStatsResult.style.display = "none";
+      return;
+    }
+
+    const storeData = JSON.parse(localStorage.getItem("ifal.task.manager.v1") || "{}");
+    let tasks = storeData.tasks || [];
+    if (Array.isArray(storeData)) tasks = storeData;
+
+    const task = tasks.find(t => String(t.id) === String(taskId));
+    if (!task) return;
+
+    // معالجة البيانات بدقة متناهية للشهر والأسبوع واليوم
+    const statistics = processSingleTaskMetrics(task);
+    
+    document.getElementById("taskStatToday").textContent = statistics.todayPercent;
+    document.getElementById("taskStatWeek").textContent = statistics.weekPercent;
+    document.getElementById("taskStatMonth").textContent = statistics.monthPercent;
+    
+    singleStatsResult.style.display = "grid";
+  });
+
+  // عند الضغط على زر عرض ملخص الكل
+  btnShowAll.addEventListener("click", () => {
+    const storeData = JSON.parse(localStorage.getItem("ifal.task.manager.v1") || "{}");
+    let tasks = storeData.tasks || [];
+    if (Array.isArray(storeData)) tasks = storeData;
+
+    allSummaryResult.innerHTML = "";
+    let containsActiveTasks = false;
+
+    tasks.forEach(task => {
+      if (!task) return;
+      const statistics = processSingleTaskMetrics(task);
+      
+      // استبعاد المهام الخامله تماماً (التي لم يتم تسجيل أي تنفيذ أو عدم تنفيذ لها خلال الشهر الحالي)
+      if (statistics.doneMonthCount === 0 && statistics.missedMonthCount === 0) {
+        return; 
+      }
+
+      containsActiveTasks = true;
+      const title = task.title || task.text || task.name || "مهمة بدون اسم";
+      
+      const row = document.createElement("div");
+      row.style.marginBottom = "18px";
+      row.style.paddingBottom = "12px";
+      row.style.borderBottom = "1px solid #e2e8f0";
+      
+      row.innerHTML = `
+        <div style="font-weight: bold; font-size: 1.1rem; color: #1e293b; margin-bottom: 6px;">${title}</div>
+        <div style="display: flex; gap: 20px; font-size: 0.95rem; flex-wrap: wrap;">
+          <div style="color: #16a34a;">● تم التنفيذ: <span style="font-weight: bold;">${statistics.doneMonthPercent}</span> (عدد المرات: ${statistics.doneMonthCount})</div>
+          <div style="color: #dc2626;">● لم يتم التنفيذ: <span style="font-weight: bold;">${statistics.missedMonthPercent}</span> (عدد المرات: ${statistics.missedMonthCount})</div>
+        </div>
+      `;
+      allSummaryResult.appendChild(row);
+    });
+
+    if (!containsActiveTasks) {
+      allSummaryResult.innerHTML = '<div style="text-align: center; color: #64748b; padding: 10px;">لا توجد أي مهام نشطة أو مفعّلة في السجلات لهذا الشهر الحالي.</div>';
+    }
+
+    allSummaryResult.style.display = "block";
+    allSummaryResult.scrollIntoView({ behavior: 'smooth' });
+  });
+
+  // محرك الحسابات البرمجية لتفكيك سجلات التواريخ لكل مهمة
+  function processSingleTaskMetrics(task) {
+    const dateToday = new Date(); // التوقيت الفعلي الحالي في الرياض لعام 2026
+    const currentYear = dateToday.getFullYear();
+    const currentMonth = dateToday.getMonth(); // يبدأ من 0 حتى 11
+    const todayISOStr = dateToday.toISOString().split('T')[0];
+
+    // تجميع مصفوفة آخر 7 أيام لحساب الأسبوع الحالي
+    const last7Days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      last7Days.push(d.toISOString().split('T')[0]);
+    }
+
+    // تجميع مصفوفة أيام الشهر الحالي من يوم 1 حتى يومنا الحالي
+    const monthDaysList = [];
+    const currentDayNo = dateToday.getDate();
+    const formattedMonthNum = String(currentMonth + 1).padStart(2, '0');
+    for (let i = 1; i <= currentDayNo; i++) {
+      monthDaysList.push(`${currentYear}-${formattedMonthNum}-${String(i).padStart(2, '0')}`);
+    }
+
+    // استخلاص الهيكل البنيوي للتاريخ الخاص بالمهمة لتغطية كافة الإصدارات والأنماط الممكنة
+    let dataLogs = task.history || task.historyDates || task.completed || task.logs || {};
+    
+    let isDoneToday = false;
+    let isMissedToday = false;
+    let doneWeekCount = 0;
+    let missedWeekCount = 0;
+    let doneMonthCount = 0;
+    let missedMonthCount = 0;
+
+    if (typeof dataLogs === 'object' && !Array.isArray(dataLogs)) {
+      // نمط الخريطة المفتاحية (Object Mapping: Key-Value)
+      if (dataLogs[todayISOStr] !== undefined) {
+        if (dataLogs[todayISOStr] === true || dataLogs[todayISOStr] === 1 || dataLogs[todayISOStr] === 'completed') isDoneToday = true;
+        else isMissedToday = true;
+      }
+      
+      last7Days.forEach(day => {
+        if (dataLogs[day] !== undefined) {
+          if (dataLogs[day] === true || dataLogs[day] === 1 || dataLogs[day] === 'completed') doneWeekCount++;
+          else missedWeekCount++;
+        }
+      });
+
+      monthDaysList.forEach(day => {
+        if (dataLogs[day] !== undefined) {
+          if (dataLogs[day] === true || dataLogs[day] === 1 || dataLogs[day] === 'completed') doneMonthCount++;
+          else missedMonthCount++;
+        }
+      });
+    } else if (Array.isArray(dataLogs)) {
+      // نمط قائمة التواريخ المباشرة (Array Pattern)
+      const cleanDatesSet = new Set();
+      dataLogs.forEach(entry => {
+        if (typeof entry === 'string') cleanDatesSet.add(entry.split('T')[0]);
+        else if (entry && entry.date) cleanDatesSet.add(entry.date.split('T')[0]);
+      });
+
+      if (cleanDatesSet.has(todayISOStr)) isDoneToday = true; else isMissedToday = true;
+
+      last7Days.forEach(day => {
+        if (cleanDatesSet.has(day)) doneWeekCount++; else missedWeekCount++;
+      });
+
+      monthDaysList.forEach(day => {
+        if (cleanDatesSet.has(day)) doneMonthCount++; else missedMonthCount++;
+      });
+    }
+
+    const totalWeek = doneWeekCount + missedWeekCount;
+    const totalMonth = doneMonthCount + missedMonthCount;
+
+    return {
+      todayPercent: isDoneToday ? "100%" : "0%",
+      weekPercent: totalWeek > 0 ? Math.round((doneWeekCount / totalWeek) * 100) + "%" : "0%",
+      monthPercent: totalMonth > 0 ? Math.round((doneMonthCount / totalMonth) * 100) + "%" : "0%",
+      doneMonthCount,
+      missedMonthCount,
+      doneMonthPercent: totalMonth > 0 ? Math.round((doneMonthCount / totalMonth) * 100) + "%" : "0%",
+      missedMonthPercent: totalMonth > 0 ? Math.round((missedMonthCount / totalMonth) * 100) + "%" : "0%"
+    };
+  }
+});
+
 function isOlderThanDays(value, days) {
   if (!value) return false;
   const date = new Date(value);

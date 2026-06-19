@@ -23,10 +23,46 @@
           <button class="nav-button active" data-view="main">المهام الرئيسية</button>
           <button class="nav-button" data-view="lists">عام القوائم</button>
           <button class="nav-button" data-view="settingsHub">الإعدادات</button>
+          <button class="nav-button" id="btnDetailedStatsNav" type="button" style="background-color: #115e59; color: white; margin-top: 10px; border-radius: 6px;">احصائيات مدققه</button>
         </nav>
       </aside>
 
       <main class="content">
+        <div id="detailedStatsView" style="display: none; padding: 20px; background: #ffffff; border-radius: 8px; margin: 15px 0; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #0f766e; padding-bottom: 10px;">
+            <h2 style="margin: 0; color: #0f766e; font-size: 1.4rem;">الإحصائيات المدققة للمهام</h2>
+            <button id="btnDetailedStatsBack" type="button" style="background: #e11d48; color: white; padding: 6px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold;">رجوع</button>
+          </div>
+
+          <div style="margin-bottom: 25px; padding: 15px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc;">
+            <label for="detailedTaskSelect" style="display: block; margin-bottom: 8px; font-weight: bold; color: #334155;">اختر مهمة معينة لعرض تقريرها المجدول:</label>
+            <select id="detailedTaskSelect" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 1rem; color: #1e293b; max-height: 200px;">
+              <option value="">-- اضغط هنا لاختيار المهمة --</option>
+            </select>
+            
+            <div id="singleTaskStatsResult" style="display: none; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-top: 20px;">
+              <div style="background: white; padding: 15px; border-radius: 6px; text-align: center; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                <div style="font-size: 0.9rem; color: #64748b; font-weight: bold;">إنجاز اليوم</div>
+                <div id="taskStatToday" style="font-size: 1.6rem; font-weight: bold; color: #0f766e; margin-top: 5px;">0%</div>
+              </div>
+              <div style="background: white; padding: 15px; border-radius: 6px; text-align: center; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                <div style="font-size: 0.9rem; color: #64748b; font-weight: bold;">إنجاز الأسبوع</div>
+                <div id="taskStatWeek" style="font-size: 1.6rem; font-weight: bold; color: #0f766e; margin-top: 5px;">0%</div>
+              </div>
+              <div style="background: white; padding: 15px; border-radius: 6px; text-align: center; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                <div style="font-size: 0.9rem; color: #64748b; font-weight: bold;">إنجاز الشهر الحالي</div>
+                <div id="taskStatMonth" style="font-size: 1.6rem; font-weight: bold; color: #0f766e; margin-top: 5px;">0%</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 15px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc;">
+            <button id="btnShowAllSummary" type="button" style="background: #0f766e; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; font-size: 1rem; box-shadow: 0 2px 4px rgba(15,118,110,0.2);">عرض ملخص الكل</button>
+            
+            <div id="allTasksSummaryResult" style="margin-top: 20px; display: none; max-height: 400px; overflow-y: auto; background: white; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0;">
+              </div>
+          </div>
+        </div>
         <div class="mobile-brandbar">
           <div>
             <h1>افعل</h1>

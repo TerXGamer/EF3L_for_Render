@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#087f5b" />
+    <meta name="description" content="افعل - مدير مهام يومي عربي واضح وفعّال." />
+    <title>افعل | مهامك بوضوح</title>
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css?v=20260703-1" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="القوائم">
+        <div class="brand sidebar-brand">
+          <img class="brand-mark" src="icon.svg" alt="" width="44" height="44" />
+          <div>
+            <h1>افعل</h1>
+            <p>مساحة الإنجاز اليومية</p>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-button active" data-view="main" type="button">
+            <i data-lucide="layout-dashboard" aria-hidden="true"></i>
+            <span>اليوم</span>
+          </button>
+          <button class="nav-button" data-view="lists" type="button">
+            <i data-lucide="list-checks" aria-hidden="true"></i>
+            <span>السجلات</span>
+          </button>
+          <button class="nav-button" data-view="settingsHub" type="button">
+            <i data-lucide="settings-2" aria-hidden="true"></i>
+            <span>الإعدادات</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="user-chip">
+            <span class="user-avatar" aria-hidden="true"><i data-lucide="user-round"></i></span>
+            <div>
+              <strong id="userBadge">غير مسجل</strong>
+              <span id="syncIndicator">محفوظ محليًا</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="content">
+        <div class="mobile-brandbar">
+          <div class="brand">
+            <img class="brand-mark" src="icon.svg" alt="" width="38" height="38" />
+            <div>
+              <h1>افعل</h1>
+              <p id="mobileUserBadge">غير مسجل</p>
+            </div>
+          </div>
+        </div>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="todayLabel"></p>
+            <h2 id="viewTitle">مهام اليوم</h2>
+          </div>
+          <div class="top-actions">
+            <button class="icon-button" id="syncNow" type="button" title="مزامنة الآن" aria-label="مزامنة الآن">
+              <i data-lucide="refresh-cw" aria-hidden="true"></i>
+            </button>
+            <button class="primary-button" data-action="new-task" type="button" aria-label="مهمة جديدة">
+              <i data-lucide="plus" aria-hidden="true"></i>
+              <span>مهمة جديدة</span>
+            </button>
+          </div>
+        </header>
+
+        <section class="view active" id="view-main" aria-labelledby="viewTitle">
+          <div class="summary-grid main-summary" id="mainSummary"></div>
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">الآن</p>
+              <h3>جاهزة للتنفيذ</h3>
+            </div>
+            <span id="activeCount"></span>
+          </div>
+          <div class="task-list" id="activeTasks"></div>
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">لاحقًا</p>
+              <h3>قادمة اليوم</h3>
+            </div>
+            <span id="upcomingCount"></span>
+          </div>
+          <div class="task-list" id="upcomingTasks"></div>
+        </section>
+
+        <section class="view" id="view-settings" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="settings">
+            <button class="subnav-button active" data-view="settings" type="button">إعدادات المهام</button>
+            <button class="subnav-button" data-view="stats" type="button">الإحصائيات</button>
+            <button class="subnav-button" data-view="dataExport" type="button">جميع المهام والبيانات</button>
+            <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
+            <button class="subnav-button" data-view="account" type="button">حسابي</button>
+            <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+          </div>
+          <div class="settings-layout">
+            <form class="form-panel" id="taskForm">
+              <input type="hidden" id="taskId" />
+              <div class="form-row">
+                <label for="taskTitle">اسم المهمة</label>
+                <input id="taskTitle" required maxlength="80" autocomplete="off" />
+              </div>
+              <div class="form-row">
+                <label for="taskDescription">وصف المهمة</label>
+                <textarea id="taskDescription" rows="3" maxlength="260"></textarea>
+              </div>
+              <div class="form-grid">
+                <div class="form-row">
+                  <label for="taskStartDate">تبدأ من يوم</label>
+                  <input id="taskStartDate" type="date" required />
+                </div>
+                <div class="form-row">
+                  <label for="taskRecurrence">التكرار</label>
+                  <select id="taskRecurrence">
+                    <option value="daily">كل يوم</option>
+                    <option value="weekly">كل أسبوع</option>
+                    <option value="monthly">كل شهر</option>
+                    <option value="custom">كل عدد أيام</option>
+                    <option value="once">مرة واحدة</option>
+                  </select>
+                </div>
+                <div class="form-row">
+                  <label for="taskInterval">كل كم يوم</label>
+                  <input id="taskInterval" type="number" min="1" max="365" value="3" />
+                  <small class="hint" id="intervalHint">يُستخدم عند اختيار تكرار: كل عدد أيام.</small>
+                </div>
+                <div class="form-row">
+                  <label for="taskDependency">مرتبطة بمهمة</label>
+                  <select id="taskDependency"></select>
+                  <small class="hint" id="dependencyHint">تظهر هنا فقط مهام القائمة الرئيسية المتاحة الآن.</small>
+                </div>
+                <div class="form-row">
+                  <label for="taskTime">وقت الظهور</label>
+                  <input id="taskTime" type="time" required />
+                </div>
+                <div class="form-row">
+                  <label for="taskEndTime">وقت الانتهاء</label>
+                  <input id="taskEndTime" type="time" required />
+                </div>
+              </div>
+              <fieldset class="importance-field">
+                <legend>مدى الأهمية</legend>
+                <div class="segmented" id="importanceButtons">
+                  <button type="button" data-importance="2">2 منخفض</button>
+                  <button type="button" data-importance="4">4 متوسط</button>
+                  <button type="button" data-importance="6">6 عالي</button>
+                  <button type="button" data-importance="8">8 عالي جدًا</button>
+                  <button type="button" data-importance="10">10 قمة</button>
+                </div>
+              </fieldset>
+              <label class="check-row">
+                <input id="taskRequiredOverdue" type="checkbox" />
+                <span>انتقال للمهام المنتهية الواجبة إذا لم تتم</span>
+              </label>
+              <label class="check-row">
+                <input id="taskActive" type="checkbox" checked />
+                <span>المهمة مفعلة</span>
+              </label>
+              <div class="button-row">
+                <button class="primary-button" type="submit">حفظ المهمة</button>
+                <button class="ghost-button" id="resetTaskForm" type="button">تفريغ النموذج</button>
+              </div>
+            </form>
+
+            <div class="settings-side">
+              <section class="plain-panel">
+                <div class="section-head">
+                  <h3>حد الظهور اليومي</h3>
+                  <span id="windowStatus"></span>
+                </div>
+                <label class="check-row">
+                  <input id="windowEnabled" type="checkbox" />
+                  <span>تفعيل وقت ثانوي للظهور</span>
+                </label>
+                <div class="form-grid two">
+                  <div class="form-row">
+                    <label for="windowStart">من</label>
+                    <input id="windowStart" type="time" />
+                  </div>
+                  <div class="form-row">
+                    <label for="windowEnd">إلى</label>
+                    <input id="windowEnd" type="time" />
+                  </div>
+                </div>
+                <div class="button-row">
+                  <button class="primary-button" id="saveWindow" type="button">حفظ حد الظهور</button>
+                </div>
+              </section>
+
+              <section class="plain-panel">
+                <div class="section-head">
+                  <h3>ملفات الإعدادات</h3>
+                  <span id="settingsCount"></span>
+                </div>
+                <div class="button-row wrap">
+                  <button class="primary-button" id="saveSettingsSnapshot" type="button">حفظ نسخة إعدادات</button>
+                  <button class="ghost-button" id="exportSettings" type="button">إصدار إعدادات</button>
+                  <label class="file-button">
+                    إدخال إعدادات
+                    <input id="importSettings" type="file" accept=".txt,.json,application/json,text/plain" />
+                  </label>
+                </div>
+                <div class="history-list" id="settingsHistory"></div>
+              </section>
+            </div>
+          </div>
+
+          <div class="section-head">
+            <h3>المهام المحفوظة</h3>
+            <span id="taskSettingsCount"></span>
+          </div>
+          <div class="task-list" id="settingsTasks"></div>
+        </section>
+
+        <section class="view" id="view-required" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="lists">
+            <button class="subnav-button active" data-view="required" type="button">الواجبة</button>
+            <button class="subnav-button" data-view="optional" type="button">ليست مهمة</button>
+            <button class="subnav-button" data-view="never" type="button">لم تنفذ أبدًا</button>
+            <button class="subnav-button" data-view="deleted" type="button">المحذوفة</button>
+            <button class="subnav-button" data-view="completed" type="button">تم تنفيذها</button>
+          </div>
+          <div class="task-list" id="requiredTasks"></div>
+        </section>
+
+        <section class="view" id="view-optional" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="lists">
+            <button class="subnav-button" data-view="required" type="button">الواجبة</button>
+            <button class="subnav-button active" data-view="optional" type="button">ليست مهمة</button>
+            <button class="subnav-button" data-view="never" type="button">لم تنفذ أبدًا</button>
+            <button class="subnav-button" data-view="deleted" type="button">المحذوفة</button>
+            <button class="subnav-button" data-view="completed" type="button">تم تنفيذها</button>
+          </div>
+          <div class="task-list" id="optionalTasks"></div>
+        </section>
+
+        <section class="view" id="view-never" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="lists">
+            <button class="subnav-button" data-view="required" type="button">الواجبة</button>
+            <button class="subnav-button" data-view="optional" type="button">ليست مهمة</button>
+            <button class="subnav-button active" data-view="never" type="button">لم تنفذ أبدًا</button>
+            <button class="subnav-button" data-view="deleted" type="button">المحذوفة</button>
+            <button class="subnav-button" data-view="completed" type="button">تم تنفيذها</button>
+          </div>
+          <div class="section-head">
+            <h3>سلة المهام غير المنفذة</h3>
+            <div class="button-row compact">
+              <button class="ghost-button" id="neverSortNewest" type="button">الأحدث</button>
+              <button class="ghost-button" id="neverSortOldest" type="button">الأقدم</button>
+              <button class="ghost-button" id="selectFirstTen" type="button">تحديد أول 10</button>
+              <button class="danger-button" id="deleteSelectedNever" type="button">حذف المحدد</button>
+              <button class="danger-button" id="deleteAllNever" type="button">حذف الكل</button>
+            </div>
+          </div>
+          <div class="task-list" id="neverTasks"></div>
+        </section>
+
+        <section class="view" id="view-deleted" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="lists">
+            <button class="subnav-button" data-view="required" type="button">الواجبة</button>
+            <button class="subnav-button" data-view="optional" type="button">ليست مهمة</button>
+            <button class="subnav-button" data-view="never" type="button">لم تنفذ أبدًا</button>
+            <button class="subnav-button active" data-view="deleted" type="button">المحذوفة</button>
+            <button class="subnav-button" data-view="completed" type="button">تم تنفيذها</button>
+          </div>
+          <div class="task-list" id="deletedTasks"></div>
+        </section>
+
+        <section class="view" id="view-completed" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="lists">
+            <button class="subnav-button" data-view="required" type="button">الواجبة</button>
+            <button class="subnav-button" data-view="optional" type="button">ليست مهمة</button>
+            <button class="subnav-button" data-view="never" type="button">لم تنفذ أبدًا</button>
+            <button class="subnav-button" data-view="deleted" type="button">المحذوفة</button>
+            <button class="subnav-button active" data-view="completed" type="button">تم تنفيذها</button>
+          </div>
+          <div class="section-head">
+            <h3>مهام تم تنفيذها</h3>
+            <div class="button-row compact">
+              <button class="ghost-button" id="completedSortNewest" type="button">الأحدث</button>
+              <button class="ghost-button" id="completedSortOldest" type="button">الأقدم</button>
+            </div>
+          </div>
+          <div class="task-list" id="completedTasks"></div>
+        </section>
+
+        <section class="view" id="view-stats" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="settings">
+            <button class="subnav-button" data-view="settings" type="button">إعدادات المهام</button>
+            <button class="subnav-button active" data-view="stats" type="button">الإحصائيات</button>
+            <button class="subnav-button" data-view="dataExport" type="button">جميع المهام والبيانات</button>
+            <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
+            <button class="subnav-button" data-view="account" type="button">حسابي</button>
+            <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+          </div>
+          <div class="stats-page-actions">
+            <button class="primary-button" data-action="open-audit-stats" type="button">احصائيات مدققه</button>
+          </div>
+          <div class="summary-grid" id="statsSummary"></div>
+          <div class="stats-layout">
+            <section class="plain-panel">
+              <div class="section-head"><h3>اليوم</h3><span id="dailyCompare"></span></div>
+              <div id="dailyStats"></div>
+            </section>
+            <section class="plain-panel">
+              <div class="section-head"><h3>الأسبوع</h3><span id="weeklyCompare"></span></div>
+              <div id="weeklyStats"></div>
+            </section>
+            <section class="plain-panel">
+              <div class="section-head"><h3>الشهر</h3><span id="monthlyCompare"></span></div>
+              <div id="monthlyStats"></div>
+            </section>
+            <section class="plain-panel wide">
+              <div class="section-head"><h3>حسب الأهمية</h3><span></span></div>
+              <div id="importanceStats"></div>
+            </section>
+            <section class="plain-panel wide">
+              <div class="section-head">
+                <h3>إعدادات الإحصائيات</h3>
+                <div class="button-row compact">
+                  <span id="statsSourceCount"></span>
+                  <button class="ghost-button" id="statsSettingsToggle" type="button">فتح</button>
+                </div>
+              </div>
+              <div class="history-list hidden" id="statsSourceList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-statsAudit" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="settings">
+            <button class="subnav-button" data-view="settings" type="button">إعدادات المهام</button>
+            <button class="subnav-button active" data-view="stats" type="button">الإحصائيات</button>
+            <button class="subnav-button" data-view="dataExport" type="button">جميع المهام والبيانات</button>
+            <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
+            <button class="subnav-button" data-view="account" type="button">حسابي</button>
+            <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+          </div>
+          <section class="plain-panel">
+            <div class="section-head audit-head">
+              <h3>احصائيات مدققه</h3>
+              <div class="button-row compact">
+                <button class="ghost-button" data-action="back-to-stats" type="button">رجوع</button>
+                <button class="primary-button" data-action="toggle-audit-picker" type="button">اختيار مهمة</button>
+                <button class="ghost-button" data-action="show-audit-summary" type="button">عرض ملخص الكل</button>
+              </div>
+            </div>
+            <div class="audit-picker hidden" id="auditTaskPicker">
+              <div class="form-row">
+                <label for="auditTaskSelect">المهمة</label>
+                <select id="auditTaskSelect"></select>
+              </div>
+            </div>
+          </section>
+          <div class="summary-grid" id="auditSingleSummary"></div>
+          <div class="stats-layout hidden" id="auditSingleStats">
+            <section class="plain-panel">
+              <div class="section-head"><h3>اليوم</h3><span id="auditDailyMeta"></span></div>
+              <div id="auditDailyStats"></div>
+            </section>
+            <section class="plain-panel">
+              <div class="section-head"><h3>الأسبوع</h3><span id="auditWeeklyMeta"></span></div>
+              <div id="auditWeeklyStats"></div>
+            </section>
+            <section class="plain-panel">
+              <div class="section-head"><h3>الشهر</h3><span id="auditMonthlyMeta"></span></div>
+              <div id="auditMonthlyStats"></div>
+            </section>
+            <section class="plain-panel wide">
+              <div class="section-head"><h3>سجل الشهر كامل</h3><span id="auditMonthLogCount"></span></div>
+              <div class="history-list" id="auditMonthLog"></div>
+            </section>
+          </div>
+          <section class="plain-panel audit-result" id="auditAllSummary"></section>
+        </section>
+
+        <section class="view" id="view-dataExport" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="settings">
+            <button class="subnav-button" data-view="settings" type="button">إعدادات المهام</button>
+            <button class="subnav-button" data-view="stats" type="button">الإحصائيات</button>
+            <button class="subnav-button active" data-view="dataExport" type="button">جميع المهام والبيانات</button>
+            <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
+            <button class="subnav-button" data-view="account" type="button">حسابي</button>
+            <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+          </div>
+          <section class="plain-panel">
+            <div class="section-head">
+              <h3>كل بيانات المهام</h3>
+              <span id="dataYearLabel"></span>
+            </div>
+            <div class="button-row compact">
+              <button class="ghost-button" id="dataSelectAllMonths" type="button">السنة كاملة</button>
+              <button class="ghost-button" id="dataClearMonths" type="button">مسح الاختيار</button>
+              <button class="primary-button" id="dataDownload" type="button">جلب البيانات</button>
+            </div>
+            <div class="month-grid" id="dataMonthButtons"></div>
+            <p class="soft-text" id="dataExportSummary"></p>
+          </section>
+        </section>
+
+        <section class="view" id="view-site" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="settings">
+            <button class="subnav-button" data-view="settings" type="button">إعدادات المهام</button>
+            <button class="subnav-button" data-view="stats" type="button">الإحصائيات</button>
+            <button class="subnav-button" data-view="dataExport" type="button">جميع المهام والبيانات</button>
+            <button class="subnav-button active" data-view="site" type="button">إعدادات الموقع</button>
+            <button class="subnav-button" data-view="account" type="button">حسابي</button>
+            <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+          </div>
+          <section class="plain-panel">
+            <div class="section-head"><h3>المظهر</h3><span></span></div>
+            <div class="form-row">
+              <label for="themeMode">شكل الموقع</label>
+              <select id="themeMode">
+                <option value="light">فاتح</option>
+                <option value="calm">هادئ</option>
+                <option value="dark">مظلم</option>
+                <option value="night">ليلي</option>
+              </select>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-account" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="settings">
+            <button class="subnav-button" data-view="settings" type="button">إعدادات المهام</button>
+            <button class="subnav-button" data-view="stats" type="button">الإحصائيات</button>
+            <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
+            <button class="subnav-button active" data-view="account" type="button">حسابي</button>
+            <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+          </div>
+          <div class="account-grid">
+            <section class="plain-panel">
+              <div class="section-head"><h3>معلومات الحساب</h3><span id="accountSyncState"></span></div>
+              <div class="account-list" id="accountDetails"></div>
+              <div class="button-row wrap">
+                <button class="primary-button" id="manualCloudSync" type="button">
+                  <i data-lucide="refresh-cw" aria-hidden="true"></i>
+                  <span>مزامنة الآن</span>
+                </button>
+                <button class="ghost-button danger" id="logoutButton" type="button">
+                  <i data-lucide="log-out" aria-hidden="true"></i>
+                  <span>تسجيل الخروج</span>
+                </button>
+              </div>
+            </section>
+            <section class="plain-panel">
+              <div class="section-head"><h3>مكان الحفظ</h3><span></span></div>
+              <p class="soft-text" id="storageExplanation"></p>
+            </section>
+            <form class="plain-panel wide account-security" id="changePasswordForm" hidden>
+              <div class="section-head">
+                <div>
+                  <p class="section-kicker">الأمان</p>
+                  <h3>تغيير كلمة المرور</h3>
+                </div>
+                <i data-lucide="shield-check" aria-hidden="true"></i>
+              </div>
+              <div class="form-grid three">
+                <div class="form-row">
+                  <label for="currentPassword">كلمة المرور الحالية</label>
+                  <input id="currentPassword" type="password" autocomplete="current-password" maxlength="128" required />
+                </div>
+                <div class="form-row">
+                  <label for="newPassword">كلمة المرور الجديدة</label>
+                  <input id="newPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required />
+                </div>
+                <div class="form-row">
+                  <label for="confirmPassword">تأكيد كلمة المرور</label>
+                  <input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required />
+                </div>
+              </div>
+              <div class="button-row">
+                <button class="primary-button" type="submit">
+                  <i data-lucide="key-round" aria-hidden="true"></i>
+                  <span>حفظ كلمة المرور</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="view" id="view-admin" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="settings">
+            <button class="subnav-button" data-view="settings" type="button">إعدادات المهام</button>
+            <button class="subnav-button" data-view="stats" type="button">الإحصائيات</button>
+            <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
+            <button class="subnav-button" data-view="account" type="button">حسابي</button>
+            <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only active" data-view="admin" type="button" hidden>الادمن</button>
+          </div>
+          <section class="plain-panel">
+            <div class="section-head">
+              <h3>مستخدمي الموقع</h3>
+              <span id="adminUserCount"></span>
+            </div>
+            <div class="account-list compact-list" id="adminUserList"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-adminReveal" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="settings">
+            <button class="subnav-button" data-view="settings" type="button">إعدادات المهام</button>
+            <button class="subnav-button" data-view="stats" type="button">الإحصائيات</button>
+            <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
+            <button class="subnav-button" data-view="account" type="button">حسابي</button>
+            <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+          </div>
+          <section class="plain-panel">
+            <div class="section-head">
+              <h3 id="adminRevealTitle">كشف</h3>
+              <button class="ghost-button" id="adminRevealBack" type="button">رجوع</button>
+            </div>
+            <div class="admin-profile-grid" id="adminRevealProfile"></div>
+            <div class="admin-task-log" id="adminRevealTasks"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-reset" aria-labelledby="viewTitle">
+          <div class="subnav" data-group="settings">
+            <button class="subnav-button" data-view="settings" type="button">إعدادات المهام</button>
+            <button class="subnav-button" data-view="stats" type="button">الإحصائيات</button>
+            <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
+            <button class="subnav-button" data-view="account" type="button">حسابي</button>
+            <button class="subnav-button active" data-view="reset" type="button">إعادة الضبط</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+          </div>
+          <section class="plain-panel danger-zone">
+            <div class="section-head"><h3>إعادة الضبط</h3><span></span></div>
+            <p>تحذف بيانات التنفيذ والقوائم، وتبقي إعدادات المهام كما هي.</p>
+            <button class="danger-button" id="resetRuntimeData" type="button">إعادة الضبط</button>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <div id="loginDialog" class="login-dialog" data-mode="login" hidden>
+      <form id="loginForm">
+        <div class="brand login-brand">
+          <img class="brand-mark" src="icon.svg" alt="" width="48" height="48" />
+          <div>
+            <h1>افعل</h1>
+            <p id="loginModeTitle">تسجيل الدخول</p>
+          </div>
+        </div>
+        <div class="segmented login-modes">
+          <button class="active" id="loginModeLogin" type="button">دخول</button>
+          <button id="loginModeCreate" type="button">إنشاء حساب</button>
+        </div>
+        <div class="form-row">
+          <label for="loginUsername">اسم المستخدم</label>
+          <input id="loginUsername" required maxlength="50" autocomplete="username" />
+        </div>
+        <div class="form-row">
+          <label for="loginPassword">كلمة المرور</label>
+          <input id="loginPassword" required minlength="4" maxlength="80" type="password" autocomplete="current-password" />
+        </div>
+        <div class="form-row create-only">
+          <label for="loginName">الاسم</label>
+          <input id="loginName" maxlength="60" autocomplete="name" />
+        </div>
+        <div class="form-row create-only">
+          <label for="loginEmail">البريد الإلكتروني</label>
+          <input id="loginEmail" maxlength="90" type="email" autocomplete="email" />
+        </div>
+        <button class="primary-button full" id="loginSubmit" type="submit">دخول</button>
+        <p class="login-note"><i data-lucide="lock-keyhole" aria-hidden="true"></i> تُحفظ تغييراتك تلقائيًا بعد الدخول.</p>
+      </form>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="lucide.js"></script>
+    <script type="module" src="app.js?v=20260730-2"></script>
+  </body>
+</html>

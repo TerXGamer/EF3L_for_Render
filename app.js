@@ -14,8 +14,9 @@ import {
 } from "./core.mjs";
 
 const STORE_KEY = "ifal.task.manager.v1";
-const CLOUD_SYNC_DELAY = 1_200;
-const CLOUD_SYNC_MIN_GAP = 4_000;
+const CLOUD_SYNC_DELAY = 250;
+const CLOUD_SYNC_MIN_GAP = 750;
+const CLOUD_PULL_INTERVAL = 1_000;
 const SCHEDULE_LOOKBACK_DAYS = 400;
 const CLOUD_API_BASE = String(globalThis.IFAL_API_BASE || "").replace(/\/$/, "");
 const CLOUD_ACCOUNT_ENDPOINT = String(globalThis.IFAL_ACCOUNT_ENDPOINT || `${CLOUD_API_BASE}/api/account`);
@@ -120,6 +121,8 @@ let selectedNever = new Set();
 let toastTimer = null;
 let cloudSaveTimer = null;
 let cloudSyncPromise = null;
+let cloudPullPromise = null;
+let lastCloudUpdatedAt = "";
 let localRevision = 0;
 let isApplyingRemote = false;
 let pendingCloudSync = false;
@@ -248,7 +251,6 @@ const el = {
   accountSyncState: document.getElementById("accountSyncState"),
   accountDetails: document.getElementById("accountDetails"),
   storageExplanation: document.getElementById("storageExplanation"),
-  manualCloudSync: document.getElementById("manualCloudSync"),
   changePasswordForm: document.getElementById("changePasswordForm"),
   currentPassword: document.getElementById("currentPassword"),
   newPassword: document.getElementById("newPassword"),
@@ -292,6 +294,9 @@ function init() {
     refreshSchedule();
     render();
   }, 60 * 1000);
+  setInterval(() => {
+    void runAutomaticSync();
+  }, CLOUD_PULL_INTERVAL);
 }
 
 function disableOfflineSystem() {
@@ -553,10 +558,6 @@ function bindEvents() {
     statsSettingsOpen = !statsSettingsOpen;
     renderStats();
   });
-  on(el.manualCloudSync, "click", async () => {
-    await syncToCloud(true);
-    render();
-  });
   on(el.changePasswordForm, "submit", async (event) => {
     event.preventDefault();
     await changeAccountPassword();
@@ -584,10 +585,13 @@ function bindEvents() {
   on(el.adminSignoutUser, "click", signoutManagedUser);
   on(el.adminDeleteUser, "click", deleteManagedUser);
   window.addEventListener("online", () => {
-    if (pendingCloudSync) scheduleCloudSave(250);
+    void runAutomaticSync(true);
   });
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && pendingCloudSync) scheduleCloudSave(250);
+    if (!document.hidden) void runAutomaticSync(true);
+  });
+  window.addEventListener("pagehide", () => {
+    if (pendingCloudSync) void syncToCloud(false);
   });
 
   document.addEventListener("click", handleActionClick);
@@ -885,6 +889,7 @@ async function handleLoginSubmit() {
 
 function applyCloudLogin(response, password) {
   const profile = response.user || {};
+  lastCloudUpdatedAt = profile.updatedAt || "";
   isApplyingRemote = true;
   const remoteData = response.data ? normalizeState(response.data) : normalizeState(state);
   state = remoteData;
@@ -913,6 +918,8 @@ async function resumeCloudSession() {
       const response = await accountRequest({ action: "session" });
       if (response.user) {
         const profile = response.user;
+        lastCloudUpdatedAt = profile.updatedAt || lastCloudUpdatedAt;
+        if (response.data) applyIncomingCloudState(response.data);
         state.user = {
           ...state.user,
           name: profile.name || state.user.name,
@@ -1286,6 +1293,82 @@ function scheduleCloudSave(delay = CLOUD_SYNC_DELAY) {
   cloudSaveTimer = setTimeout(() => syncToCloud(false), Math.max(delay, minDelay));
 }
 
+async function runAutomaticSync(force = false) {
+  if (!canCloudSync() || navigator.onLine === false || (!force && document.hidden)) return;
+  if (pendingCloudSync) {
+    scheduleCloudSave(force ? 0 : CLOUD_SYNC_DELAY);
+    return;
+  }
+  await pullFromCloud();
+}
+
+async function pullFromCloud() {
+  if (!canCloudSync() || cloudSyncPromise || cloudPullPromise) return false;
+  const tokenAtStart = state.user.authToken;
+  cloudPullPromise = (async () => {
+    try {
+      const response = await accountRequest({ action: "session" });
+      if (!canCloudSync() || state.user.authToken !== tokenAtStart || pendingCloudSync) return false;
+      const remoteUpdatedAt = response.user?.updatedAt || "";
+      const hasRemoteChanges = !lastCloudUpdatedAt || remoteUpdatedAt !== lastCloudUpdatedAt;
+      if (response.data && hasRemoteChanges) applyIncomingCloudState(response.data);
+      if (response.user) {
+        state.user = {
+          ...state.user,
+          name: response.user.name || state.user.name,
+          email: response.user.email || state.user.email,
+          username: response.user.username || state.user.username,
+        };
+      }
+      lastCloudUpdatedAt = remoteUpdatedAt || lastCloudUpdatedAt;
+      if (!hasRemoteChanges && state.sync.mode === "cloud") return true;
+      state.sync = {
+        ...state.sync,
+        lastSyncAt: new Date().toISOString(),
+        lastError: "",
+        mode: "cloud",
+      };
+      saveState(false);
+      refreshSchedule();
+      render();
+      return true;
+    } catch (error) {
+      if (error.status === 401) {
+        state.user = null;
+        saveState(false);
+        render();
+        showLogin();
+        toast("انتهت الجلسة، سجل الدخول من جديد");
+      } else {
+        state.sync = {
+          ...state.sync,
+          mode: "local",
+          lastError: "تعذر الاتصال مؤقتًا؛ سيُعاد الربط تلقائيًا.",
+        };
+        saveState(false);
+        render();
+      }
+      return false;
+    } finally {
+      cloudPullPromise = null;
+    }
+  })();
+  return cloudPullPromise;
+}
+
+function applyIncomingCloudState(data) {
+  const incoming = normalizeState(data);
+  isApplyingRemote = true;
+  mergeIncomingState(incoming);
+  if (THEME_PRESETS[incoming.settings?.theme]) {
+    state.settings.theme = incoming.settings.theme;
+  }
+  state.settings.themeCustomizations = normalizeThemeCustomizations(
+    incoming.settings?.themeCustomizations,
+  );
+  isApplyingRemote = false;
+}
+
 async function syncToCloud(manual = false) {
   if (!canCloudSync()) {
     if (manual) toast("سجل الدخول أولًا");
@@ -1307,6 +1390,7 @@ async function syncToCloud(manual = false) {
         action: "save",
         data: cloudStateSnapshot(state.user),
       });
+      lastCloudUpdatedAt = response.user?.updatedAt || lastCloudUpdatedAt;
       if (response.data) mergeIncomingState(normalizeState(response.data));
       state.sync = {
         lastSyncAt: new Date().toISOString(),
@@ -2071,8 +2155,8 @@ function render() {
     el.syncIndicator.textContent =
       state.sync.mode === "cloud"
         ? pendingCloudSync
-          ? "جارٍ حفظ التغييرات"
-          : "متزامن"
+          ? "جارٍ الحفظ التلقائي"
+          : "مزامنة تلقائية"
         : "محفوظ محليًا";
     el.syncIndicator.dataset.state = state.sync.mode;
   }
@@ -2306,9 +2390,8 @@ function renderAccount() {
     return;
   }
 
-  el.accountSyncState.textContent = state.sync.mode === "cloud" ? "مزامن" : "محفوظ محليًا";
+  el.accountSyncState.textContent = state.sync.mode === "cloud" ? "مزامنة تلقائية" : "محفوظ محليًا";
   if (el.changePasswordForm) el.changePasswordForm.hidden = !canCloudSync();
-  if (el.manualCloudSync) el.manualCloudSync.hidden = !canCloudSync();
   el.accountDetails.innerHTML = `
     ${accountRow("الاسم", user.name || "غير محدد")}
     ${accountRow("اسم المستخدم", user.username || "غير محدد")}
@@ -2318,7 +2401,7 @@ function renderAccount() {
   `;
   el.storageExplanation.textContent =
     state.sync.mode === "cloud"
-      ? "بياناتك محفوظة في PostgreSQL على Render، لذلك تظهر على الكمبيوتر والجوال عند تسجيل الدخول بنفس اسم المستخدم وكلمة المرور."
+      ? "تُحفظ تغييراتك تلقائيًا خلال أجزاء من الثانية، وتُجلب تحديثات أجهزتك الأخرى كل ثانية عبر PostgreSQL على Render."
       : state.sync.lastError || "البيانات محفوظة داخل هذا الجهاز فقط. بعد رفع الموقع على Render ستعمل المزامنة بين الأجهزة.";
 }
 

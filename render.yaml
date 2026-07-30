@@ -1,10 +1,9 @@
 services:
   - type: web
-    name: ifal-for-render
+    name: ef3l-control
     runtime: node
     plan: free
     region: frankfurt
-    branch: main
     buildCommand: npm ci && npm run build
     startCommand: npm start
     healthCheckPath: /health
@@ -14,17 +13,12 @@ services:
         value: production
       - key: APP_TIME_ZONE
         value: Asia/Riyadh
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: ifal-render-db
-          property: connectionString
-      - key: ADMIN_SET
         sync: false
 
-databases:
-  - name: ifal-render-db
-    databaseName: ifal
-    user: ifal
-    plan: free
-    region: frankfurt
-    postgresMajorVersion: "16"

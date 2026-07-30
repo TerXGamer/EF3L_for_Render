@@ -20,6 +20,30 @@ const SCHEDULE_LOOKBACK_DAYS = 400;
 const CLOUD_API_BASE = String(globalThis.IFAL_API_BASE || "").replace(/\/$/, "");
 const CLOUD_ACCOUNT_ENDPOINT = String(globalThis.IFAL_ACCOUNT_ENDPOINT || `${CLOUD_API_BASE}/api/account`);
 const CLOUD_ADMIN_ENDPOINT = String(globalThis.IFAL_ADMIN_ENDPOINT || `${CLOUD_API_BASE}/api/admin`);
+const THEME_PRESETS = {
+  light: ["#dcefe5", "#087f5b", "#d9480f"],
+  calm: ["#e7ead7", "#3b7a57", "#b7791f"],
+  ocean: ["#d8ebf0", "#087f8c", "#d55232"],
+  rose: ["#f1dce4", "#a23b62", "#397d58"],
+  dark: ["#171c1a", "#35a979", "#75a1ff"],
+  graphite: ["#1b1d20", "#4e9f92", "#e67b58"],
+  night: ["#1a1d16", "#6a8e4d", "#d0a354"],
+};
+const THEME_LABELS = {
+  light: "فاتح",
+  calm: "هادئ",
+  ocean: "بحري",
+  rose: "وردي",
+  dark: "داكن",
+  graphite: "فحمي",
+  night: "ليلي",
+};
+const CUSTOM_THEME_PROPERTIES = [
+  "--bg", "--surface", "--surface-soft", "--field", "--line", "--line-strong",
+  "--text", "--muted", "--teal", "--teal-dark", "--coral", "--amber", "--green",
+  "--red", "--blue", "--sidebar-bg", "--sidebar-text", "--sidebar-muted",
+  "--nav-hover", "--nav-active", "--toast-bg", "--toast-text", "--shadow",
+];
 
 const titles = {
   main: "مهام اليوم",
@@ -115,6 +139,7 @@ let adminSearchTerm = "";
 let adminRevealTarget = "";
 let adminRevealData = null;
 let adminRevealLoading = false;
+let themeCustomizerOpen = false;
 
 const el = {
   mobileUserBadge: document.getElementById("mobileUserBadge"),
@@ -136,6 +161,14 @@ const el = {
   syncNow: document.getElementById("syncNow"),
   themeMode: document.getElementById("themeMode"),
   themeChoices: document.getElementById("themeChoices"),
+  themePresetButton: document.getElementById("themePresetButton"),
+  themeCustomButton: document.getElementById("themeCustomButton"),
+  themeCustomizer: document.getElementById("themeCustomizer"),
+  themeCustomizationTitle: document.getElementById("themeCustomizationTitle"),
+  themeColorBackground: document.getElementById("themeColorBackground"),
+  themeColorPrimary: document.getElementById("themeColorPrimary"),
+  themeColorAccent: document.getElementById("themeColorAccent"),
+  themeCustomSave: document.getElementById("themeCustomSave"),
   toast: document.getElementById("toast"),
   mainSummary: document.getElementById("mainSummary"),
   activeTasks: document.getElementById("activeTasks"),
@@ -273,20 +306,134 @@ function disableOfflineSystem() {
 }
 
 function applyTheme() {
-  const availableThemes = ["light", "calm", "ocean", "rose", "dark", "graphite", "night"];
+  const availableThemes = Object.keys(THEME_PRESETS);
   const requestedTheme = state.settings.theme || "light";
   const theme = availableThemes.includes(requestedTheme) ? requestedTheme : "light";
+  const customization = state.settings.themeCustomizations?.[theme];
+  const customActive = customization?.mode === "custom";
   state.settings.theme = theme;
   document.documentElement.dataset.theme = theme;
-  document.documentElement.style.colorScheme = ["dark", "graphite", "night"].includes(theme)
-    ? "dark"
-    : "light";
+  clearCustomThemeColors();
+  if (customActive) {
+    applyCustomThemeColors(customization.colors);
+  } else {
+    document.documentElement.style.colorScheme = ["dark", "graphite", "night"].includes(theme)
+      ? "dark"
+      : "light";
+  }
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) themeMeta.content = (customActive ? customization.colors : THEME_PRESETS[theme])[1];
   if (el.themeMode) el.themeMode.value = theme;
   el.themeChoices?.querySelectorAll("[data-theme-value]").forEach((button) => {
     const active = button.dataset.themeValue === theme;
+    const buttonTheme = button.dataset.themeValue;
+    const buttonCustomization = state.settings.themeCustomizations?.[buttonTheme];
+    const colors = buttonCustomization?.mode === "custom"
+      ? buttonCustomization.colors
+      : THEME_PRESETS[buttonTheme];
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
+    button.querySelectorAll(".theme-swatches i").forEach((swatch, index) => {
+      swatch.style.background = colors[index];
+    });
   });
+  syncThemeCustomizationControls(theme, customActive);
+}
+
+function clearCustomThemeColors() {
+  CUSTOM_THEME_PROPERTIES.forEach((property) => document.documentElement.style.removeProperty(property));
+}
+
+function applyCustomThemeColors(colors) {
+  const [background, primary, accent] = colors;
+  const dark = colorLuminance(background) < 0.38;
+  const text = dark ? "#f7f9f8" : "#17211c";
+  const muted = mixColors(text, background, dark ? 0.58 : 0.52);
+  const surface = mixColors(background, "#ffffff", dark ? 0.08 : 0.58);
+  const sidebar = dark
+    ? mixColors(background, "#000000", 0.34)
+    : mixColors(primary, "#111815", 0.72);
+  const values = {
+    "--bg": background,
+    "--surface": surface,
+    "--surface-soft": mixColors(background, primary, dark ? 0.14 : 0.1),
+    "--field": mixColors(surface, dark ? "#000000" : "#ffffff", 0.08),
+    "--line": mixColors(background, dark ? "#ffffff" : "#000000", dark ? 0.18 : 0.14),
+    "--line-strong": mixColors(background, dark ? "#ffffff" : "#000000", dark ? 0.3 : 0.24),
+    "--text": text,
+    "--muted": muted,
+    "--teal": primary,
+    "--teal-dark": mixColors(primary, dark ? "#ffffff" : "#000000", 0.2),
+    "--coral": accent,
+    "--amber": mixColors(accent, "#d3a12f", 0.5),
+    "--green": mixColors(primary, "#2e9f55", 0.45),
+    "--red": mixColors(accent, "#c83743", 0.55),
+    "--blue": mixColors(primary, "#4275d6", 0.58),
+    "--sidebar-bg": sidebar,
+    "--sidebar-text": "#f7faf8",
+    "--sidebar-muted": mixColors("#f7faf8", sidebar, 0.35),
+    "--nav-hover": mixColors(sidebar, primary, 0.24),
+    "--nav-active": "#ffffff",
+    "--toast-bg": sidebar,
+    "--toast-text": "#ffffff",
+    "--shadow": dark ? "0 10px 28px rgba(0, 0, 0, 0.32)" : "0 8px 24px rgba(24, 33, 29, 0.1)",
+  };
+  Object.entries(values).forEach(([property, value]) => {
+    document.documentElement.style.setProperty(property, value);
+  });
+  document.documentElement.style.colorScheme = dark ? "dark" : "light";
+}
+
+function syncThemeCustomizationControls(theme, customActive) {
+  if (el.themePresetButton) {
+    el.themePresetButton.classList.toggle("active", !customActive && !themeCustomizerOpen);
+    el.themePresetButton.setAttribute("aria-pressed", String(!customActive && !themeCustomizerOpen));
+  }
+  if (el.themeCustomButton) {
+    el.themeCustomButton.classList.toggle("active", customActive || themeCustomizerOpen);
+    el.themeCustomButton.setAttribute("aria-pressed", String(customActive || themeCustomizerOpen));
+  }
+  if (el.themeCustomizer) el.themeCustomizer.hidden = !themeCustomizerOpen;
+  if (el.themeCustomizationTitle) {
+    el.themeCustomizationTitle.textContent = `تخصيص ${THEME_LABELS[theme]}`;
+  }
+}
+
+function fillThemeColorInputs(theme) {
+  const customization = state.settings.themeCustomizations?.[theme];
+  const colors = customization?.colors || THEME_PRESETS[theme];
+  el.themeColorBackground.value = colors[0];
+  el.themeColorPrimary.value = colors[1];
+  el.themeColorAccent.value = colors[2];
+}
+
+function selectedThemeInputColors() {
+  return [
+    normalizeHexColor(el.themeColorBackground?.value, THEME_PRESETS.light[0]),
+    normalizeHexColor(el.themeColorPrimary?.value, THEME_PRESETS.light[1]),
+    normalizeHexColor(el.themeColorAccent?.value, THEME_PRESETS.light[2]),
+  ];
+}
+
+function normalizeHexColor(value, fallback) {
+  const color = String(value || "").toLowerCase();
+  return /^#[0-9a-f]{6}$/.test(color) ? color : fallback;
+}
+
+function mixColors(first, second, amount) {
+  const a = first.slice(1).match(/.{2}/g).map((part) => parseInt(part, 16));
+  const b = second.slice(1).match(/.{2}/g).map((part) => parseInt(part, 16));
+  return `#${a.map((value, index) => {
+    return Math.round(value + (b[index] - value) * amount).toString(16).padStart(2, "0");
+  }).join("")}`;
+}
+
+function colorLuminance(color) {
+  const channels = color.slice(1).match(/.{2}/g).map((part) => {
+    const value = parseInt(part, 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
 }
 
 function bindEvents() {
@@ -345,8 +492,37 @@ function bindEvents() {
     const button = event.target.closest("[data-theme-value]");
     if (!button) return;
     state.settings.theme = button.dataset.themeValue;
+    themeCustomizerOpen = false;
     applyTheme();
     saveState();
+  });
+  on(el.themePresetButton, "click", () => {
+    const theme = state.settings.theme;
+    const current = state.settings.themeCustomizations?.[theme] || {};
+    state.settings.themeCustomizations[theme] = { ...current, mode: "preset" };
+    themeCustomizerOpen = false;
+    applyTheme();
+    saveState();
+    toast(`تم تطبيق ألوان ${THEME_LABELS[theme]} الجاهزة`);
+  });
+  on(el.themeCustomButton, "click", () => {
+    themeCustomizerOpen = true;
+    fillThemeColorInputs(state.settings.theme);
+    applyTheme();
+  });
+  [el.themeColorBackground, el.themeColorPrimary, el.themeColorAccent].forEach((input) => {
+    on(input, "input", () => applyCustomThemeColors(selectedThemeInputColors()));
+  });
+  on(el.themeCustomSave, "click", () => {
+    const theme = state.settings.theme;
+    state.settings.themeCustomizations[theme] = {
+      mode: "custom",
+      colors: selectedThemeInputColors(),
+    };
+    themeCustomizerOpen = false;
+    applyTheme();
+    saveState();
+    toast(`تم حفظ تخصيص ${THEME_LABELS[theme]}`);
   });
 
   on(el.taskForm, "submit", saveTaskFromForm);
@@ -426,6 +602,7 @@ function initialState() {
     instances: {},
     settings: {
       theme: "light",
+      themeCustomizations: {},
       displayWindow: {
         enabled: false,
         start: "00:00",
@@ -467,6 +644,7 @@ function normalizeState(input) {
   next.settings = {
     ...base.settings,
     ...(next.settings || {}),
+    themeCustomizations: normalizeThemeCustomizations((next.settings || {}).themeCustomizations),
     displayWindow: {
       ...base.settings.displayWindow,
       ...((next.settings || {}).displayWindow || {}),
@@ -497,6 +675,22 @@ function normalizeState(input) {
     ...(next.sync || {}),
   };
   return next;
+}
+
+function normalizeThemeCustomizations(customizations) {
+  if (!customizations || typeof customizations !== "object") return {};
+  return Object.fromEntries(Object.keys(THEME_PRESETS).flatMap((theme) => {
+    const entry = customizations[theme];
+    if (!entry || typeof entry !== "object") return [];
+    const preset = THEME_PRESETS[theme];
+    const colors = Array.isArray(entry.colors)
+      ? preset.map((fallback, index) => normalizeHexColor(entry.colors[index], fallback))
+      : [...preset];
+    return [[theme, {
+      mode: entry.mode === "custom" ? "custom" : "preset",
+      colors,
+    }]];
+  }));
 }
 
 function normalizeTask(task) {

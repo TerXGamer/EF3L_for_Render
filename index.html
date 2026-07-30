@@ -461,6 +461,33 @@
               <option value="graphite">فحمي</option>
               <option value="night">ليلي</option>
             </select>
+            <div class="segmented theme-mode-controls" role="group" aria-label="نوع ألوان المظهر">
+              <button class="active" id="themePresetButton" type="button" aria-pressed="true">جاهز</button>
+              <button id="themeCustomButton" type="button" aria-pressed="false">تخصيص</button>
+            </div>
+            <div class="theme-customizer" id="themeCustomizer" hidden>
+              <div class="section-head">
+                <h4 id="themeCustomizationTitle">تخصيص المظهر</h4>
+                <span>اختر ثلاثة ألوان</span>
+              </div>
+              <div class="theme-color-grid">
+                <label class="theme-color-field">
+                  <span>الخلفية</span>
+                  <input id="themeColorBackground" type="color" value="#dcefe5" aria-label="لون الخلفية" />
+                </label>
+                <label class="theme-color-field">
+                  <span>الأساسي</span>
+                  <input id="themeColorPrimary" type="color" value="#087f5b" aria-label="اللون الأساسي" />
+                </label>
+                <label class="theme-color-field">
+                  <span>المساند</span>
+                  <input id="themeColorAccent" type="color" value="#d9480f" aria-label="اللون المساند" />
+                </label>
+              </div>
+              <div class="button-row">
+                <button class="primary-button" id="themeCustomSave" type="button">تم</button>
+              </div>
+            </div>
           </section>
         </section>
 

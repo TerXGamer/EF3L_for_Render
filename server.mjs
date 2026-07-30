@@ -1,616 +1,685 @@
+import crypto from "node:crypto";
 import { createReadStream } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
-import { createServer } from "node:http";
+import http from "node:http";
 import path from "node:path";
-import crypto from "node:crypto";
-import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { brotliDecompressSync } from "node:zlib";
-import pg from "pg";
+import { promisify } from "node:util";
+import { Pool } from "pg";
+import {
+  accountDataSection,
+  normalizeUsername,
+  pagination,
+  safeAccountData,
+  summarizeData,
+} from "./core.mjs";
 
-const { Pool } = pg;
 const scrypt = promisify(crypto.scrypt);
-const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "public");
 const port = Number(process.env.PORT || 3000);
-const accountPaths = new Set(["/api/account", "/.netlify/functions/account"]);
-const adminPaths = new Set(["/api/admin"]);
-const publicFiles = new Set([
+const cookieName = "ef3l_admin_session";
+const sessionHours = Math.min(12, Math.max(1, Number(process.env.SESSION_HOURS || 4)));
+const protectedUsernames = new Set(
+  String(process.env.PROTECTED_USERNAMES || "tariq")
+    .split(",")
+    .map(normalizeUsername)
+    .filter(Boolean),
+);
+const loginAttempts = new Map();
+let pool;
+let schemaPromise;
+
+const staticFiles = new Set([
   "/index.html",
+  "/app.js",
   "/styles.css",
-  "/core.mjs",
   "/lucide.js",
   "/icon.svg",
-  "/sw.js",
 ]);
-const maxBodyBytes = 6 * 1024 * 1024;
-const sessionDays = Math.min(90, Math.max(1, Number(process.env.SESSION_DAYS || 30)));
-const appTimeZone = process.env.APP_TIME_ZONE || "Asia/Riyadh";
-const loginAttempts = new Map();
-
-const jsonHeaders = {
-  "Content-Type": "application/json; charset=utf-8",
-  "Cache-Control": "no-store",
-  "X-Content-Type-Options": "nosniff",
-};
 
 const securityHeaders = {
-  "X-Frame-Options": "DENY",
-  "X-Content-Type-Options": "nosniff",
-  "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
   "Content-Security-Policy":
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+  "Referrer-Policy": "no-referrer",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
 };
 
-let pool;
-let schemaReady;
-
-const server = createServer(async (request, response) => {
+const server = http.createServer(async (request, response) => {
   try {
     const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
-
-    if (url.pathname === "/health") {
-      return handleHealthRequest(response);
-    }
-
-    if (accountPaths.has(url.pathname)) {
-      return handleAccountRequest(request, response);
-    }
-
-    if (adminPaths.has(url.pathname)) {
-      return handleAdminRequest(request, response);
-    }
-
-    if (url.pathname === "/app.js") {
-      return serveBundledAppScript(request, response);
-    }
-
-    return serveStaticFile(request, response, url.pathname);
+    if (url.pathname === "/health") return handleHealth(response);
+    if (url.pathname.startsWith("/api/")) return handleApi(request, response, url);
+    return serveStatic(request, response, url.pathname);
   } catch (error) {
     console.error("Request error", error);
-    return sendJson(response, 500, { error: "حدث خطأ غير متوقع في الخادم" });
+    return sendJson(response, 500, { error: "حدث خطأ داخلي غير متوقع" });
   }
 });
 
-server.headersTimeout = 15_000;
-server.requestTimeout = 20_000;
-server.keepAliveTimeout = 5_000;
-
-server.listen(port, "0.0.0.0", () => {
-  console.log(`Ifal server listening on port ${port}`);
-  runMaintenanceTasks().catch((error) => {
-    console.error("Maintenance error", error);
-  });
+server.listen(port, () => {
+  console.log(`EF3L Control listening on port ${port}`);
+  ensureAuditSchema().catch((error) => console.error("Schema error", error));
 });
 
-function parseAdminSet() {
-  return (process.env.ADMIN_SET || "")
-    .split(",")
-    .map((item) => normalizeUsername(item))
-    .filter(Boolean);
-}
-
-function isAdminUser(username) {
-  return parseAdminSet().includes(normalizeUsername(username));
-}
-
-async function handleHealthRequest(response) {
-  if (!process.env.DATABASE_URL) {
-    return sendJson(response, 503, {
-      ok: false,
-      databaseConfigured: false,
-      databaseConnected: false,
-    });
-  }
-
+async function handleHealth(response) {
   try {
     await getPool().query("SELECT 1");
-    return sendJson(response, 200, {
-      ok: true,
-      databaseConfigured: true,
-      databaseConnected: true,
-    });
+    return sendJson(response, 200, { ok: true, databaseConnected: true });
   } catch {
-    return sendJson(response, 503, {
-      ok: false,
-      databaseConfigured: true,
-      databaseConnected: false,
-    });
+    return sendJson(response, 503, { ok: false, databaseConnected: false });
   }
 }
 
-function currentMonthRange() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: appTimeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  const year = Number(values.year);
-  const month = Number(values.month);
-  const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
-  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const monthEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-  const monthLabel = new Intl.DateTimeFormat("ar-SA-u-ca-gregory", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${monthStart}T12:00:00Z`));
-  return { monthStart, monthEnd, monthLabel };
+async function handleApi(request, response, url) {
+  response.setHeader("Cache-Control", "no-store");
+  const pathname = url.pathname;
+  if (pathname === "/api/auth/login" && request.method === "POST") {
+    return login(request, response);
+  }
+
+  const session = readAdminSession(request);
+  if (pathname === "/api/session" && request.method === "GET") {
+    return sendJson(response, 200, session ? sessionResponse(session) : { authenticated: false });
+  }
+  if (!session) return sendJson(response, 401, { error: "يلزم تسجيل دخول المدير" });
+  if (isMutation(request.method) && request.headers["x-csrf-token"] !== session.csrf) {
+    return sendJson(response, 403, { error: "رمز حماية الطلب غير صالح" });
+  }
+
+  await ensureAuditSchema();
+  if (pathname === "/api/auth/logout" && request.method === "POST") {
+    clearSessionCookie(request, response);
+    await logAudit(session.sub, "logout", session.sub, {});
+    return sendJson(response, 200, { ok: true });
+  }
+  if (pathname === "/api/overview" && request.method === "GET") {
+    return overview(response);
+  }
+  if (pathname === "/api/accounts" && request.method === "GET") {
+    return listAccounts(response, url);
+  }
+  if (pathname === "/api/audit" && request.method === "GET") {
+    return listAudit(response, url);
+  }
+
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts[0] !== "api" || parts[1] !== "accounts" || !parts[2]) {
+    return sendJson(response, 404, { error: "المسار غير موجود" });
+  }
+  const username = normalizeUsername(decodeURIComponent(parts[2]));
+  if (!username) return sendJson(response, 400, { error: "اسم المستخدم غير صالح" });
+
+  if (parts.length === 3 && request.method === "GET") {
+    return accountDetails(response, username);
+  }
+  if (parts[3] === "items" && request.method === "GET") {
+    return accountItems(response, username, url);
+  }
+  if (parts[3] === "raw" && request.method === "GET") {
+    return accountRaw(response, username, url);
+  }
+  if (parts[3] === "export" && request.method === "GET") {
+    return exportAccount(response, username);
+  }
+  if (parts[3] === "profile" && request.method === "PATCH") {
+    return updateProfile(request, response, session, username);
+  }
+  if (parts[3] === "password" && request.method === "POST") {
+    return resetPassword(request, response, session, username);
+  }
+  if (parts[3] === "sessions" && request.method === "DELETE") {
+    return revokeSessions(response, session, username);
+  }
+  if (parts[3] === "items" && parts[4] && request.method === "DELETE") {
+    return deleteAccountItem(response, session, username, decodeURIComponent(parts[4]), url);
+  }
+  if (parts.length === 3 && request.method === "DELETE") {
+    return deleteAccount(response, session, username);
+  }
+  return sendJson(response, 404, { error: "المسار غير موجود" });
 }
 
-async function handleAccountRequest(request, response) {
-  if (request.method !== "POST") {
-    return sendJson(response, 405, { error: "طريقة الطلب غير مسموحة" }, { Allow: "POST" });
+async function login(request, response) {
+  const ip = clientIp(request);
+  if (isRateLimited(ip)) {
+    return sendJson(response, 429, { error: "محاولات كثيرة. انتظر 15 دقيقة ثم حاول مجددًا." });
   }
-  if (!process.env.DATABASE_URL) {
-    return sendJson(response, 503, { error: "قاعدة البيانات غير متصلة في هذا التشغيل" });
-  }
-
-  try {
-    await ensureSchema();
-    const body = await readJsonBody(request);
-    const action = cleanText(body.action, 40);
-
-    if (action === "create") {
-      return createAccount(request, response, body);
-    }
-
-    if (action === "login") {
-      return loginAccount(request, response, body);
-    }
-
-    const authenticated = await authenticateRequest(request, body);
-    if (!authenticated) {
-      return sendJson(response, 401, { error: "انتهت الجلسة أو بيانات الدخول غير صحيحة" });
-    }
-
-    if (action === "session") {
-      return sendJson(response, 200, publicResponse(authenticated.account));
-    }
-
-    if (action === "logout") {
-      if (authenticated.tokenHash) {
-        await getPool().query(`DELETE FROM account_sessions WHERE token_hash = $1`, [
-          authenticated.tokenHash,
-        ]);
-      }
-      return sendJson(response, 200, { ok: true });
-    }
-
-    if (action === "change-password") {
-      return changePassword(response, authenticated.account, body);
-    }
-
-    if (action === "save") {
-      const incomingData = sanitizeData(body.data, authenticated.account.username);
-      const nextData = mergeCloudData(authenticated.account.data, incomingData);
-      const nextSummary = buildSummary(nextData);
-      const updatedAt = new Date().toISOString();
-      const nextName = nextData?.user?.name
-        ? cleanText(nextData.user.name, 80)
-        : authenticated.account.name;
-      const nextEmail = nextData?.user?.email
-        ? cleanText(nextData.user.email, 120)
-        : authenticated.account.email;
-
-      await getPool().query(
-        `UPDATE accounts
-            SET name = $2,
-                email = $3,
-                data = $4::jsonb,
-                summary = $5::jsonb,
-                updated_at = $6
-          WHERE username = $1`,
-        [
-          authenticated.account.username,
-          nextName,
-          nextEmail,
-          JSON.stringify(nextData),
-          JSON.stringify(nextSummary),
-          updatedAt,
-        ],
-      );
-
-      return sendJson(
-        response,
-        200,
-        publicResponse({
-          ...authenticated.account,
-          name: nextName,
-          email: nextEmail,
-          data: nextData,
-          summary: nextSummary,
-          updatedAt,
-        }),
-      );
-    }
-
-    return sendJson(response, 400, { error: "طلب غير معروف" });
-  } catch (error) {
-    return handleApiError(response, "Account API error", error);
-  }
-}
-
-async function createAccount(request, response, body) {
-  const username = normalizeUsername(body.username);
+  const body = await readJson(request);
+  const username = String(body.username || "").trim();
   const password = String(body.password || "");
-  const name = cleanText(body.name, 80);
-  const email = cleanText(body.email, 120);
-  const validationError = validateNewAccount({ username, password, name, email });
-  if (validationError) return sendJson(response, 400, { error: validationError });
-
-  const attemptKey = requestAttemptKey(request, username);
-  if (isRateLimited(attemptKey)) {
-    return sendJson(response, 429, { error: "محاولات كثيرة؛ انتظر قليلًا ثم حاول مرة أخرى" });
+  const expectedUsername = String(process.env.ADMIN_USERNAME || "");
+  const expectedPassword = String(process.env.ADMIN_PASSWORD || "");
+  if (
+    !expectedUsername ||
+    expectedPassword.length < 12 ||
+    !constantTimeEqual(username.toLocaleLowerCase("en-US"), expectedUsername.toLocaleLowerCase("en-US")) ||
+    !constantTimeEqual(password, expectedPassword)
+  ) {
+    recordFailure(ip);
+    return sendJson(response, 401, { error: "اسم المدير أو كلمة المرور غير صحيحة" });
   }
-
-  const existing = await readAccount(username);
-  if (existing) {
-    recordFailedAttempt(attemptKey);
-    return sendJson(response, 409, { error: "اسم المستخدم موجود مسبقًا" });
-  }
-
-  const now = new Date().toISOString();
-  const salt = crypto.randomBytes(16).toString("hex");
-  const account = {
-    username,
-    name,
-    email,
-    salt,
-    passwordHash: await hashPassword(password, salt),
-    data: {},
-    summary: {},
-    createdAt: now,
-    updatedAt: now,
+  clearFailures(ip);
+  const now = Math.floor(Date.now() / 1000);
+  const session = {
+    sub: expectedUsername,
+    csrf: crypto.randomBytes(24).toString("base64url"),
+    iat: now,
+    exp: now + sessionHours * 3600,
+    jti: crypto.randomUUID(),
   };
-  await upsertAccount(account);
-  const token = await createSession(username);
-  clearAttempts(attemptKey);
-  return sendJson(response, 201, publicResponse(account, token));
+  setSessionCookie(request, response, signSession(session));
+  await ensureAuditSchema();
+  await logAudit(session.sub, "login", session.sub, { ip });
+  return sendJson(response, 200, sessionResponse(session));
 }
 
-async function loginAccount(request, response, body) {
-  const username = normalizeUsername(body.username);
-  const password = String(body.password || "");
-  if (!username || !password) {
-    return sendJson(response, 400, { error: "اسم المستخدم وكلمة المرور مطلوبة" });
-  }
+async function overview(response) {
+  const [databaseResult, countsResult, tablesResult, recentResult, auditResult] = await Promise.all([
+    getPool().query(
+      `SELECT current_database() AS database_name,
+              pg_database_size(current_database())::bigint AS database_bytes`,
+    ),
+    getPool().query(
+      `SELECT
+         count(*)::bigint AS accounts,
+         COALESCE(sum(jsonb_array_length(
+           CASE WHEN jsonb_typeof(data->'tasks') = 'array' THEN data->'tasks' ELSE '[]'::jsonb END
+         )), 0)::bigint AS task_settings,
+         COALESCE(sum((
+           SELECT count(*) FROM jsonb_object_keys(
+             CASE WHEN jsonb_typeof(data->'instances') = 'object' THEN data->'instances' ELSE '{}'::jsonb END
+           )
+         )), 0)::bigint AS task_records,
+         COALESCE(sum(pg_column_size(data) + pg_column_size(summary)), 0)::bigint AS users_data_bytes
+       FROM accounts`,
+    ),
+    getPool().query(
+      `SELECT relname AS name, pg_total_relation_size(relid)::bigint AS bytes,
+              n_live_tup::bigint AS rows_estimate
+         FROM pg_stat_user_tables
+        ORDER BY pg_total_relation_size(relid) DESC`,
+    ),
+    getPool().query(
+      `SELECT username, name, email, created_at, updated_at, pg_column_size(data)::bigint AS data_bytes
+         FROM accounts ORDER BY updated_at DESC LIMIT 6`,
+    ),
+    getPool().query(
+      `SELECT id, admin_username, action, target_username, details, created_at
+         FROM admin_audit_log ORDER BY created_at DESC LIMIT 8`,
+    ),
+  ]);
 
-  const attemptKey = requestAttemptKey(request, username);
-  if (isRateLimited(attemptKey)) {
-    return sendJson(response, 429, { error: "محاولات كثيرة؛ انتظر قليلًا ثم حاول مرة أخرى" });
-  }
-
-  const account = await authenticateAccount(username, password, true);
-  if (!account) {
-    recordFailedAttempt(attemptKey);
-    return sendJson(response, 401, { error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
-  }
-
-  const token = await createSession(account.username);
-  clearAttempts(attemptKey);
-  return sendJson(response, 200, publicResponse(account, token));
-}
-
-async function changePassword(response, account, body) {
-  const currentPassword = String(body.currentPassword || "");
-  const newPassword = String(body.newPassword || "");
-  if (!(await verifyPassword(account, currentPassword))) {
-    return sendJson(response, 401, { error: "كلمة المرور الحالية غير صحيحة" });
-  }
-  if (newPassword.length < 8 || newPassword.length > 128) {
-    return sendJson(response, 400, { error: "كلمة المرور الجديدة يجب أن تكون بين 8 و128 حرفًا" });
-  }
-
-  const salt = crypto.randomBytes(16).toString("hex");
-  const passwordHash = await hashPassword(newPassword, salt);
-  await getPool().query(
-    `UPDATE accounts SET salt = $2, password_hash = $3, updated_at = NOW() WHERE username = $1`,
-    [account.username, salt, passwordHash],
+  const databaseBytes = Number(databaseResult.rows[0].database_bytes);
+  const capacityBytes = Math.max(
+    databaseBytes,
+    Number(process.env.DATABASE_CAPACITY_BYTES || 1_073_741_824),
   );
-  await getPool().query(`DELETE FROM account_sessions WHERE username = $1`, [account.username]);
-  const token = await createSession(account.username);
-  return sendJson(response, 200, { ok: true, token });
-}
-
-async function handleAdminRequest(request, response) {
-  if (request.method !== "POST") {
-    return sendJson(response, 405, { error: "طريقة الطلب غير مسموحة" }, { Allow: "POST" });
-  }
-  if (!process.env.DATABASE_URL) {
-    return sendJson(response, 503, { error: "قاعدة البيانات غير متصلة في هذا التشغيل" });
-  }
-
-  try {
-    await ensureSchema();
-    const body = await readJsonBody(request);
-    const authenticated = await authenticateRequest(request, body);
-    if (!authenticated) {
-      return sendJson(response, 401, { error: "انتهت الجلسة أو بيانات الدخول غير صحيحة" });
-    }
-    if (!isAdminUser(authenticated.account.username)) {
-      return sendJson(response, 403, { error: "غير مصرح" });
-    }
-
-    if (body.action === "check") {
-      return sendJson(response, 200, { isAdmin: true });
-    }
-
-    if (body.action === "list") {
-      const result = await getPool().query(
-        `SELECT username, name, email, summary, created_at, updated_at
-           FROM accounts
-          ORDER BY LOWER(username) ASC`,
-      );
-      return sendJson(response, 200, {
-        users: result.rows.map((row) => adminUserSummary(row)),
-      });
-    }
-
-    if (body.action === "reveal") {
-      const targetUsername = normalizeUsername(body.targetUsername);
-      if (!targetUsername) {
-        return sendJson(response, 400, { error: "اسم المستخدم المطلوب إدارته غير صالح" });
-      }
-      const target = await readAccount(targetUsername);
-      if (!target) return sendJson(response, 404, { error: "المستخدم غير موجود" });
-      const { monthStart, monthEnd, monthLabel } = currentMonthRange();
-      return sendJson(response, 200, buildAdminRevealReport(target, monthStart, monthEnd, monthLabel));
-    }
-
-    if (body.action === "update-user") {
-      const targetUsername = normalizeUsername(body.targetUsername);
-      const target = targetUsername ? await readAccount(targetUsername) : null;
-      if (!target) return sendJson(response, 404, { error: "المستخدم غير موجود" });
-
-      const name = cleanText(body.name, 80);
-      const email = cleanText(body.email, 120).toLocaleLowerCase("en-US");
-      if (!name) return sendJson(response, 400, { error: "اسم الحساب مطلوب" });
-      if (!isValidEmail(email)) {
-        return sendJson(response, 400, { error: "البريد الإلكتروني غير صالح" });
-      }
-
-      const nextData =
-        target.data && typeof target.data === "object" && !Array.isArray(target.data)
-          ? structuredClone(target.data)
-          : {};
-      nextData.user = {
-        ...(nextData.user && typeof nextData.user === "object" ? nextData.user : {}),
-        username: target.username,
-        name,
-        email,
-      };
-
-      const result = await getPool().query(
-        `UPDATE accounts
-            SET name = $2, email = $3, data = $4::jsonb, updated_at = NOW()
-          WHERE username = $1
-          RETURNING username, name, email, summary, created_at, updated_at`,
-        [target.username, name, email, JSON.stringify(nextData)],
-      );
-      logAdminAction(authenticated.account.username, "تعديل الحساب", target.username);
-      return sendJson(response, 200, {
-        ok: true,
-        user: adminUserSummary(result.rows[0]),
-      });
-    }
-
-    if (body.action === "reset-password") {
-      const targetUsername = normalizeUsername(body.targetUsername);
-      const newPassword = String(body.newPassword || "");
-      if (!targetUsername || !(await readAccount(targetUsername))) {
-        return sendJson(response, 404, { error: "المستخدم غير موجود" });
-      }
-      if (targetUsername === normalizeUsername(authenticated.account.username)) {
-        return sendJson(response, 400, {
-          error: "غيّر كلمة مرور حساب المدير من صفحة حسابي",
-        });
-      }
-      if (newPassword.length < 8 || newPassword.length > 128) {
-        return sendJson(response, 400, {
-          error: "كلمة المرور الجديدة يجب أن تكون بين 8 و128 حرفًا",
-        });
-      }
-
-      const salt = crypto.randomBytes(16).toString("hex");
-      const passwordHash = await hashPassword(newPassword, salt);
-      const client = await getPool().connect();
-      try {
-        await client.query("BEGIN");
-        await client.query(
-          `UPDATE accounts SET salt = $2, password_hash = $3, updated_at = NOW()
-            WHERE username = $1`,
-          [targetUsername, salt, passwordHash],
-        );
-        await client.query(`DELETE FROM account_sessions WHERE username = $1`, [targetUsername]);
-        await client.query("COMMIT");
-      } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-      } finally {
-        client.release();
-      }
-      logAdminAction(authenticated.account.username, "إعادة كلمة المرور", targetUsername);
-      return sendJson(response, 200, { ok: true });
-    }
-
-    if (body.action === "signout-user") {
-      const targetUsername = normalizeUsername(body.targetUsername);
-      if (!targetUsername || !(await readAccount(targetUsername))) {
-        return sendJson(response, 404, { error: "المستخدم غير موجود" });
-      }
-      if (targetUsername === normalizeUsername(authenticated.account.username)) {
-        return sendJson(response, 400, { error: "لا يمكن إنهاء جلستك من لوحة الإدارة" });
-      }
-      await getPool().query(`DELETE FROM account_sessions WHERE username = $1`, [targetUsername]);
-      logAdminAction(authenticated.account.username, "تسجيل خروج الحساب", targetUsername);
-      return sendJson(response, 200, { ok: true });
-    }
-
-    if (body.action === "delete-user") {
-      const targetUsername = normalizeUsername(body.targetUsername);
-      if (!targetUsername || !(await readAccount(targetUsername))) {
-        return sendJson(response, 404, { error: "المستخدم غير موجود" });
-      }
-      if (
-        targetUsername === normalizeUsername(authenticated.account.username) ||
-        isAdminUser(targetUsername)
-      ) {
-        return sendJson(response, 400, { error: "لا يمكن حذف حساب مدير من لوحة الإدارة" });
-      }
-      await getPool().query(`DELETE FROM accounts WHERE username = $1`, [targetUsername]);
-      logAdminAction(authenticated.account.username, "حذف الحساب", targetUsername);
-      return sendJson(response, 200, { ok: true });
-    }
-
-    return sendJson(response, 400, { error: "طلب غير معروف" });
-  } catch (error) {
-    return handleApiError(response, "Admin API error", error);
-  }
-}
-
-function adminUserSummary(row) {
-  const summary = row?.summary && typeof row.summary === "object" ? row.summary : {};
-  return {
-    username: normalizeUsername(row?.username),
-    name: cleanText(row?.name, 80),
-    email: cleanText(row?.email, 120),
-    isAdmin: isAdminUser(row?.username),
-    taskSettingsCount: Number(summary.taskSettingsCount || 0),
-    completedCount: Number(summary.completedCount || 0),
-    createdAt: row?.created_at instanceof Date ? row.created_at.toISOString() : row?.created_at || null,
-    updatedAt: row?.updated_at instanceof Date ? row.updated_at.toISOString() : row?.updated_at || null,
-  };
-}
-
-function logAdminAction(adminUsername, action, targetUsername) {
-  console.info(
-    `إجراء إداري: ${cleanText(action, 60)} | المدير=${normalizeUsername(adminUsername)} | الحساب=${normalizeUsername(targetUsername)}`,
-  );
-}
-
-function buildAdminRevealReport(account, monthStart, monthEnd, monthLabel) {
-  const data = account.data && typeof account.data === "object" ? account.data : {};
-  const tasks = Array.isArray(data.tasks) ? data.tasks : [];
-  const instances =
-    data.instances && typeof data.instances === "object" ? Object.values(data.instances) : [];
-  const monthInstances = instances.filter(
-    (item) => item?.date && item.date >= monthStart && item.date <= monthEnd,
-  );
-  const lastLogin = cleanText(data?.user?.loggedInAt || "", 40) || null;
-
-  const taskReports = tasks.map((task) => {
-    const taskInstances = monthInstances.filter((item) => item.taskId === task.id);
-    const completedInstances = taskInstances.filter((item) => item.status === "completed");
-    const lastAppearanceInstance = taskInstances
-      .slice()
-      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
-    const lastCompletedInstance = completedInstances
-      .slice()
-      .sort((a, b) =>
-        String(b.completedAt || b.updatedAt || "").localeCompare(
-          String(a.completedAt || a.updatedAt || ""),
-        ),
-      )[0];
-
-    return {
-      id: cleanId(task.id),
-      title: cleanText(task.title, 120),
-      active: task.active !== false,
-      createdAt: task.createdAt || null,
-      appearanceFrom: task.time || null,
-      appearanceTo: task.endTime || null,
-      lastAppearance: lastAppearanceInstance?.date || null,
-      lastCompletion: lastCompletedInstance?.completedAt || lastCompletedInstance?.updatedAt || null,
-      completionCount: completedInstances.length,
-      monthRecords: taskInstances.length,
-    };
-  });
-
-  return {
-    user: {
-      username: account.username,
-      name: account.name,
-      email: account.email,
-      isAdmin: isAdminUser(account.username),
-      createdAt: account.createdAt,
-      updatedAt: account.updatedAt,
-      lastLogin,
+  const counts = countsResult.rows[0];
+  return sendJson(response, 200, {
+    storage: {
+      databaseBytes,
+      capacityBytes,
+      remainingBytes: Math.max(0, capacityBytes - databaseBytes),
+      usedPercent: Number(((databaseBytes / capacityBytes) * 100).toFixed(3)),
+      usersDataBytes: Number(counts.users_data_bytes),
+      estimated: true,
     },
-    month: { start: monthStart, end: monthEnd, label: monthLabel },
-    tasks: taskReports,
+    counts: {
+      accounts: Number(counts.accounts),
+      taskSettings: Number(counts.task_settings),
+      taskRecords: Number(counts.task_records),
+      sessions: await sessionCount(),
+    },
+    database: {
+      actualName: databaseResult.rows[0].database_name,
+      displayName: process.env.DATABASE_DISPLAY_NAME || "ifal-render-db",
+      region: process.env.DATABASE_REGION || "frankfurt",
+      version: process.env.DATABASE_VERSION || "16",
+      expiresAt: process.env.DATABASE_EXPIRES_AT || null,
+      sourceAppUrl: process.env.SOURCE_APP_URL || "https://ef3l.onrender.com",
+    },
+    tables: tablesResult.rows.map((row) => ({
+      ...row,
+      bytes: Number(row.bytes),
+      rowsEstimate: Number(row.rows_estimate),
+    })),
+    recentAccounts: recentResult.rows.map(publicAccountRow),
+    recentAudit: auditResult.rows,
+    generatedAt: new Date().toISOString(),
+  });
+}
+
+async function listAccounts(response, url) {
+  const { limit, offset } = pagination(url.searchParams.get("limit"), url.searchParams.get("offset"));
+  const search = String(url.searchParams.get("search") || "").trim().slice(0, 100);
+  const pattern = `%${search}%`;
+  const where = search
+    ? "WHERE username ILIKE $1 OR name ILIKE $1 OR email ILIKE $1"
+    : "";
+  const params = search ? [pattern, limit, offset] : [limit, offset];
+  const limitIndex = search ? 2 : 1;
+  const [rows, count] = await Promise.all([
+    getPool().query(
+      `SELECT a.username, a.name, a.email, a.summary, a.created_at, a.updated_at,
+              (pg_column_size(a.data) + pg_column_size(a.summary))::bigint AS storage_bytes,
+              jsonb_array_length(
+                CASE WHEN jsonb_typeof(a.data->'tasks') = 'array' THEN a.data->'tasks' ELSE '[]'::jsonb END
+              )::bigint AS task_settings_count,
+              (SELECT count(*) FROM jsonb_object_keys(
+                CASE WHEN jsonb_typeof(a.data->'instances') = 'object' THEN a.data->'instances' ELSE '{}'::jsonb END
+              ))::bigint AS task_records_count,
+              (SELECT count(*) FROM account_sessions s WHERE s.username = a.username)::bigint AS sessions_count
+         FROM accounts a ${where}
+        ORDER BY a.updated_at DESC
+        LIMIT $${limitIndex} OFFSET $${limitIndex + 1}`,
+      params,
+    ),
+    getPool().query(`SELECT count(*)::bigint AS total FROM accounts ${where}`, search ? [pattern] : []),
+  ]);
+  return sendJson(response, 200, {
+    items: rows.rows.map((row) => ({
+      ...publicAccountRow(row),
+      summary: row.summary || {},
+      storageBytes: Number(row.storage_bytes),
+      taskSettingsCount: Number(row.task_settings_count),
+      taskRecordsCount: Number(row.task_records_count),
+      sessionsCount: Number(row.sessions_count),
+      protected: protectedUsernames.has(row.username),
+    })),
+    total: Number(count.rows[0].total),
+    limit,
+    offset,
+  });
+}
+
+async function accountDetails(response, username) {
+  const [accountResult, sessionsResult] = await Promise.all([
+    getPool().query(
+      `SELECT username, name, email, data, summary, created_at, updated_at,
+              (pg_column_size(data) + pg_column_size(summary))::bigint AS storage_bytes
+         FROM accounts WHERE username = $1`,
+      [username],
+    ),
+    getPool().query(
+      `SELECT created_at, last_used_at, expires_at
+         FROM account_sessions WHERE username = $1 ORDER BY last_used_at DESC`,
+      [username],
+    ),
+  ]);
+  if (!accountResult.rowCount) return sendJson(response, 404, { error: "الحساب غير موجود" });
+  const row = accountResult.rows[0];
+  const data = safeAccountData(row.data);
+  return sendJson(response, 200, {
+    account: {
+      ...publicAccountRow(row),
+      summary: row.summary || summarizeData(data),
+      storageBytes: Number(row.storage_bytes),
+      protected: protectedUsernames.has(username),
+    },
+    counts: summarizeData(data),
+    sessions: sessionsResult.rows,
+    sections: {
+      version: data.version ?? null,
+      user: data.user || null,
+      settings: data.settings || null,
+      meta: data.meta || null,
+      sync: data.sync || null,
+    },
+  });
+}
+
+async function accountItems(response, username, url) {
+  const type = url.searchParams.get("type") === "records" ? "records" : "tasks";
+  const { limit, offset } = pagination(url.searchParams.get("limit"), url.searchParams.get("offset"));
+  const search = String(url.searchParams.get("search") || "").trim().toLocaleLowerCase();
+  const status = String(url.searchParams.get("status") || "").trim();
+  const data = await accountData(username);
+  if (!data) return sendJson(response, 404, { error: "الحساب غير موجود" });
+  let items =
+    type === "records"
+      ? Object.entries(data.instances || {}).map(([id, item]) => ({ id, ...(item || {}) }))
+      : (Array.isArray(data.tasks) ? data.tasks : []);
+  if (search) {
+    items = items.filter((item) => JSON.stringify(item).toLocaleLowerCase().includes(search));
+  }
+  if (status && type === "records") {
+    items = items.filter((item) => String(item.status || "") === status);
+  }
+  items.sort((a, b) =>
+    String(b.updatedAt || b.createdAt || b.date || "").localeCompare(
+      String(a.updatedAt || a.createdAt || a.date || ""),
+    ),
+  );
+  return sendJson(response, 200, {
+    type,
+    items: items.slice(offset, offset + limit),
+    total: items.length,
+    limit,
+    offset,
+  });
+}
+
+async function accountRaw(response, username, url) {
+  const data = await accountData(username);
+  if (!data) return sendJson(response, 404, { error: "الحساب غير موجود" });
+  const section = String(url.searchParams.get("section") || "");
+  return sendJson(response, 200, {
+    section: section || "account",
+    value: section === "summary" ? summarizeData(data) : accountDataSection(data, section),
+  });
+}
+
+async function exportAccount(response, username) {
+  const result = await getPool().query(
+    `SELECT username, name, email, data, summary, created_at, updated_at
+       FROM accounts WHERE username = $1`,
+    [username],
+  );
+  if (!result.rowCount) return sendJson(response, 404, { error: "الحساب غير موجود" });
+  const payload = JSON.stringify(
+    { exportedAt: new Date().toISOString(), account: result.rows[0] },
+    null,
+    2,
+  );
+  response.writeHead(200, {
+    ...securityHeaders,
+    "Cache-Control": "no-store",
+    "Content-Type": "application/json; charset=utf-8",
+    "Content-Disposition": `attachment; filename="ef3l-${username}.json"`,
+    "Content-Length": Buffer.byteLength(payload),
+  });
+  response.end(payload);
+}
+
+async function updateProfile(request, response, session, username) {
+  const body = await readJson(request);
+  const name = String(body.name || "").trim().slice(0, 80);
+  const email = String(body.email || "").trim().toLocaleLowerCase().slice(0, 120);
+  if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return sendJson(response, 400, { error: "الاسم أو البريد غير صالح" });
+  }
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const selected = await client.query("SELECT data FROM accounts WHERE username = $1 FOR UPDATE", [username]);
+    if (!selected.rowCount) {
+      await client.query("ROLLBACK");
+      return sendJson(response, 404, { error: "الحساب غير موجود" });
+    }
+    const data = safeAccountData(selected.rows[0].data);
+    data.user = { ...(data.user || {}), username, name, email };
+    await client.query(
+      `UPDATE accounts SET name = $2, email = $3, data = $4::jsonb, updated_at = NOW()
+        WHERE username = $1`,
+      [username, name, email, JSON.stringify(data)],
+    );
+    await client.query("COMMIT");
+    await logAudit(session.sub, "update_profile", username, { name, email });
+    return sendJson(response, 200, { ok: true });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function resetPassword(request, response, session, username) {
+  const body = await readJson(request);
+  const password = String(body.password || "");
+  if (password.length < 8 || password.length > 128) {
+    return sendJson(response, 400, { error: "كلمة المرور يجب أن تكون بين 8 و128 حرفًا" });
+  }
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = Buffer.from(
+    await scrypt(password, salt, 64, { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }),
+  ).toString("hex");
+  const result = await getPool().query(
+    `UPDATE accounts SET salt = $2, password_hash = $3, updated_at = NOW()
+      WHERE username = $1`,
+    [username, salt, hash],
+  );
+  if (!result.rowCount) return sendJson(response, 404, { error: "الحساب غير موجود" });
+  await getPool().query("DELETE FROM account_sessions WHERE username = $1", [username]);
+  await logAudit(session.sub, "reset_password", username, { sessionsRevoked: true });
+  return sendJson(response, 200, { ok: true });
+}
+
+async function revokeSessions(response, session, username) {
+  const result = await getPool().query("DELETE FROM account_sessions WHERE username = $1", [username]);
+  await logAudit(session.sub, "revoke_sessions", username, { count: result.rowCount });
+  return sendJson(response, 200, { ok: true, count: result.rowCount });
+}
+
+async function deleteAccountItem(response, session, username, itemId, url) {
+  const type = url.searchParams.get("type") === "records" ? "records" : "tasks";
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query("SELECT data FROM accounts WHERE username = $1 FOR UPDATE", [username]);
+    if (!result.rowCount) {
+      await client.query("ROLLBACK");
+      return sendJson(response, 404, { error: "الحساب غير موجود" });
+    }
+    const data = safeAccountData(result.rows[0].data);
+    const deletedAt = new Date().toISOString();
+    data.meta = data.meta && typeof data.meta === "object" ? data.meta : {};
+    if (type === "tasks") {
+      const before = Array.isArray(data.tasks) ? data.tasks.length : 0;
+      data.tasks = (Array.isArray(data.tasks) ? data.tasks : []).filter(
+        (task) => String(task?.id || "") !== itemId,
+      );
+      if (data.tasks.length === before) {
+        await client.query("ROLLBACK");
+        return sendJson(response, 404, { error: "المهمة غير موجودة" });
+      }
+      data.meta.taskTombstones = { ...(data.meta.taskTombstones || {}), [itemId]: deletedAt };
+      data.instances = Object.fromEntries(
+        Object.entries(data.instances || {}).filter(([, item]) => String(item?.taskId || "") !== itemId),
+      );
+    } else {
+      if (!data.instances?.[itemId]) {
+        await client.query("ROLLBACK");
+        return sendJson(response, 404, { error: "السجل غير موجود" });
+      }
+      delete data.instances[itemId];
+      data.meta.instanceTombstones = { ...(data.meta.instanceTombstones || {}), [itemId]: deletedAt };
+    }
+    const summary = summarizeData(data);
+    await client.query(
+      `UPDATE accounts SET data = $2::jsonb, summary = $3::jsonb, updated_at = NOW()
+        WHERE username = $1`,
+      [username, JSON.stringify(data), JSON.stringify(summary)],
+    );
+    await client.query("COMMIT");
+    await logAudit(session.sub, type === "tasks" ? "delete_task" : "delete_record", username, {
+      itemId,
+    });
+    return sendJson(response, 200, { ok: true });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function deleteAccount(response, session, username) {
+  if (protectedUsernames.has(username)) {
+    return sendJson(response, 403, { error: "هذا الحساب محمي ولا يمكن حذفه" });
+  }
+  const result = await getPool().query("DELETE FROM accounts WHERE username = $1", [username]);
+  if (!result.rowCount) return sendJson(response, 404, { error: "الحساب غير موجود" });
+  await logAudit(session.sub, "delete_account", username, {});
+  return sendJson(response, 200, { ok: true });
+}
+
+async function listAudit(response, url) {
+  const { limit, offset } = pagination(url.searchParams.get("limit"), url.searchParams.get("offset"));
+  const [rows, count] = await Promise.all([
+    getPool().query(
+      `SELECT id, admin_username, action, target_username, details, created_at
+         FROM admin_audit_log ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+      [limit, offset],
+    ),
+    getPool().query("SELECT count(*)::bigint AS total FROM admin_audit_log"),
+  ]);
+  return sendJson(response, 200, {
+    items: rows.rows,
+    total: Number(count.rows[0].total),
+    limit,
+    offset,
+  });
+}
+
+async function accountData(username) {
+  const result = await getPool().query("SELECT data FROM accounts WHERE username = $1", [username]);
+  return result.rowCount ? safeAccountData(result.rows[0].data) : null;
+}
+
+async function sessionCount() {
+  const result = await getPool().query("SELECT count(*)::bigint AS total FROM account_sessions");
+  return Number(result.rows[0].total);
+}
+
+function publicAccountRow(row) {
+  return {
+    username: row.username,
+    name: row.name,
+    email: row.email,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    dataBytes: Number(row.data_bytes || 0),
   };
 }
 
-async function authenticateRequest(request, body) {
-  const token = bearerToken(request);
-  if (token) {
-    const tokenHash = hashToken(token);
-    const result = await getPool().query(
-      `SELECT a.username, a.name, a.email, a.salt, a.password_hash, a.data, a.summary,
-              a.created_at, a.updated_at
-         FROM account_sessions s
-         JOIN accounts a ON a.username = s.username
-        WHERE s.token_hash = $1 AND s.expires_at > NOW()`,
-      [tokenHash],
-    );
-    if (result.rows[0]) {
-      getPool()
-        .query(`UPDATE account_sessions SET last_used_at = NOW() WHERE token_hash = $1`, [tokenHash])
-        .catch(() => {});
-      return { account: mapAccount(result.rows[0]), tokenHash };
+async function logAudit(adminUsername, action, targetUsername, details) {
+  await getPool().query(
+    `INSERT INTO admin_audit_log (admin_username, action, target_username, details)
+     VALUES ($1, $2, $3, $4::jsonb)`,
+    [adminUsername, action, targetUsername || "", JSON.stringify(details || {})],
+  );
+}
+
+function ensureAuditSchema() {
+  if (!schemaPromise) {
+    schemaPromise = getPool()
+      .query(
+        `CREATE TABLE IF NOT EXISTS admin_audit_log (
+           id BIGSERIAL PRIMARY KEY,
+           admin_username TEXT NOT NULL,
+           action TEXT NOT NULL,
+           target_username TEXT NOT NULL DEFAULT '',
+           details JSONB NOT NULL DEFAULT '{}'::jsonb,
+           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+         );
+         CREATE INDEX IF NOT EXISTS admin_audit_log_created_at_idx
+           ON admin_audit_log (created_at DESC);`,
+      )
+      .catch((error) => {
+        schemaPromise = null;
+        throw error;
+      });
+  }
+  return schemaPromise;
+}
+
+function getPool() {
+  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL غير مضبوط");
+  if (!pool) {
+    const connectionString = process.env.DATABASE_URL;
+    const config = {
+      connectionString,
+      max: Math.min(10, Math.max(1, Number(process.env.PG_POOL_MAX || 4))),
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 10_000,
+    };
+    if (/sslmode=require/i.test(connectionString) || /\.render\.com/i.test(connectionString)) {
+      config.ssl = { rejectUnauthorized: false };
     }
+    pool = new Pool(config);
+    pool.on("error", (error) => console.error("Database pool error", error));
   }
-
-  const username = normalizeUsername(body.username);
-  const password = String(body.password || "");
-  if (!username || !password) return null;
-  const account = await authenticateAccount(username, password, true);
-  return account ? { account, tokenHash: null } : null;
+  return pool;
 }
 
-async function authenticateAccount(username, password, upgradeLegacy = false) {
-  const account = await readAccount(username);
-  if (!account || !(await verifyPassword(account, password))) return null;
-  if (upgradeLegacy && isLegacyPassword(account)) {
-    const salt = crypto.randomBytes(16).toString("hex");
-    const passwordHash = await hashPassword(password, salt);
-    await getPool().query(
-      `UPDATE accounts SET salt = $2, password_hash = $3, updated_at = NOW() WHERE username = $1`,
-      [account.username, salt, passwordHash],
-    );
-    account.salt = salt;
-    account.passwordHash = passwordHash;
+function sessionResponse(session) {
+  return {
+    authenticated: true,
+    username: session.sub,
+    csrfToken: session.csrf,
+    expiresAt: new Date(session.exp * 1000).toISOString(),
+  };
+}
+
+function signSession(payload) {
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = crypto
+    .createHmac("sha256", sessionSecret())
+    .update(encoded)
+    .digest("base64url");
+  return `${encoded}.${signature}`;
+}
+
+function readAdminSession(request) {
+  const token = parseCookies(request.headers.cookie || "")[cookieName];
+  if (!token) return null;
+  const [encoded, signature] = token.split(".");
+  if (!encoded || !signature) return null;
+  const expected = crypto.createHmac("sha256", sessionSecret()).update(encoded).digest("base64url");
+  if (!constantTimeEqual(signature, expected)) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+    const expectedUser = String(process.env.ADMIN_USERNAME || "");
+    if (
+      payload.exp <= Math.floor(Date.now() / 1000) ||
+      !constantTimeEqual(String(payload.sub || "").toLowerCase(), expectedUser.toLowerCase())
+    ) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
   }
-  return account;
 }
 
-function isLegacyPassword(account) {
-  return !account.salt || !/^[a-f0-9]{128}$/i.test(account.passwordHash || "");
+function sessionSecret() {
+  const secret = String(process.env.SESSION_SECRET || "");
+  if (secret.length < 32) throw new Error("SESSION_SECRET يجب أن يكون 32 حرفًا على الأقل");
+  return secret;
 }
 
-async function verifyPassword(account, password) {
-  if (!password) return false;
-  if (isLegacyPassword(account)) {
-    return constantTimeTextEqual(account.passwordHash || "", password);
-  }
-  const candidate = await hashPassword(password, account.salt);
-  return constantTimeTextEqual(account.passwordHash, candidate);
+function setSessionCookie(request, response, token) {
+  const secure = process.env.NODE_ENV === "production" || request.headers["x-forwarded-proto"] === "https";
+  response.setHeader(
+    "Set-Cookie",
+    `${cookieName}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessionHours * 3600}${secure ? "; Secure" : ""}`,
+  );
 }
 
-async function hashPassword(password, salt) {
-  const derived = await scrypt(String(password), String(salt), 64, {
-    N: 16384,
-    r: 8,
-    p: 1,
-    maxmem: 64 * 1024 * 1024,
-  });
-  return Buffer.from(derived).toString("hex");
+function clearSessionCookie(request, response) {
+  const secure = process.env.NODE_ENV === "production" || request.headers["x-forwarded-proto"] === "https";
+  response.setHeader(
+    "Set-Cookie",
+    `${cookieName}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure ? "; Secure" : ""}`,
+  );
 }
 
-function constantTimeTextEqual(first, second) {
+function parseCookies(header) {
+  return Object.fromEntries(
+    header
+      .split(";")
+      .map((part) => part.trim().split("="))
+      .filter(([key, value]) => key && value)
+      .map(([key, ...value]) => [key, value.join("=")]),
+  );
+}
+
+function constantTimeEqual(first, second) {
   const left = Buffer.from(String(first));
   const right = Buffer.from(String(second));
   if (left.length !== right.length) {
@@ -620,532 +689,65 @@ function constantTimeTextEqual(first, second) {
   return crypto.timingSafeEqual(left, right);
 }
 
-async function createSession(username) {
-  const token = crypto.randomBytes(32).toString("base64url");
-  const tokenHash = hashToken(token);
-  await getPool().query(
-    `INSERT INTO account_sessions (token_hash, username, expires_at)
-     VALUES ($1, $2, NOW() + make_interval(days => $3::int))`,
-    [tokenHash, username, sessionDays],
-  );
-  getPool().query(`DELETE FROM account_sessions WHERE expires_at <= NOW()`).catch(() => {});
-  return token;
-}
-
-function bearerToken(request) {
-  const match = /^Bearer\s+([A-Za-z0-9_-]{20,})$/i.exec(String(request.headers.authorization || ""));
-  return match ? match[1] : "";
-}
-
-function hashToken(token) {
-  return crypto.createHash("sha256").update(String(token)).digest("hex");
-}
-
-function mergeCloudData(existingInput, incomingInput) {
-  const existing = sanitizeData(existingInput, incomingInput?.user?.username);
-  const incoming = sanitizeData(incomingInput, incomingInput?.user?.username);
-  if (!Object.keys(existing).length) return incoming;
-  if (!Object.keys(incoming).length) return existing;
-
-  const existingMeta = existing.meta || {};
-  const incomingMeta = incoming.meta || {};
-  const meta = {
-    taskTombstones: mergeTimestampMaps(
-      existingMeta.taskTombstones,
-      incomingMeta.taskTombstones,
-    ),
-    instanceTombstones: mergeTimestampMaps(
-      existingMeta.instanceTombstones,
-      incomingMeta.instanceTombstones,
-    ),
-    runtimeResetAt: latestTimestamp(existingMeta.runtimeResetAt, incomingMeta.runtimeResetAt),
-  };
-
-  const tasks = mergeRecords(existing.tasks, incoming.tasks)
-    .filter((task) => isAfterTombstone(task.updatedAt, meta.taskTombstones[task.id]))
-    .slice(0, 1000);
-  const instances = Object.fromEntries(
-    mergeRecords(Object.values(existing.instances || {}), Object.values(incoming.instances || {}))
-      .filter((instance) => {
-        const deletedAt = latestTimestamp(
-          meta.instanceTombstones[instance.id],
-          meta.runtimeResetAt,
-        );
-        return isAfterTombstone(instance.updatedAt || instance.createdAt, deletedAt);
-      })
-      .slice(-50_000)
-      .map((instance) => [instance.id, instance]),
-  );
-
-  const existingSettings = existing.settings || {};
-  const incomingSettings = incoming.settings || {};
-  const snapshots = mergeRecords(existingSettings.snapshots, incomingSettings.snapshots)
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-    .slice(0, 30);
-
-  return {
-    ...existing,
-    ...incoming,
-    version: Math.max(Number(existing.version || 1), Number(incoming.version || 1)),
-    user: { ...(existing.user || {}), ...(incoming.user || {}) },
-    tasks,
-    instances,
-    settings: {
-      ...existingSettings,
-      ...incomingSettings,
-      snapshots,
-      statsExcludedInstanceIds: uniqueStrings(
-        existingSettings.statsExcludedInstanceIds,
-        incomingSettings.statsExcludedInstanceIds,
-      ),
-      hiddenListInstanceIds: uniqueStrings(
-        existingSettings.hiddenListInstanceIds,
-        incomingSettings.hiddenListInstanceIds,
-      ),
-    },
-    meta,
-  };
-}
-
-function mergeRecords(first, second) {
-  const map = new Map();
-  [...(Array.isArray(first) ? first : []), ...(Array.isArray(second) ? second : [])].forEach(
-    (item) => {
-      if (!item?.id) return;
-      const current = map.get(item.id);
-      if (
-        !current ||
-        new Date(item.updatedAt || item.createdAt || 0).getTime() >=
-          new Date(current.updatedAt || current.createdAt || 0).getTime()
-      ) {
-        map.set(item.id, item);
-      }
-    },
-  );
-  return Array.from(map.values());
-}
-
-function mergeTimestampMaps(first, second) {
-  const merged = { ...(first || {}) };
-  Object.entries(second || {}).forEach(([id, value]) => {
-    merged[id] = latestTimestamp(merged[id], value);
-  });
-  return merged;
-}
-
-function latestTimestamp(first, second) {
-  if (!first) return second || null;
-  if (!second) return first;
-  return new Date(first).getTime() >= new Date(second).getTime() ? first : second;
-}
-
-function isAfterTombstone(updatedAt, deletedAt) {
-  if (!deletedAt) return true;
-  return new Date(updatedAt || 0).getTime() > new Date(deletedAt).getTime();
-}
-
-function uniqueStrings(first, second) {
-  return Array.from(
-    new Set([...(Array.isArray(first) ? first : []), ...(Array.isArray(second) ? second : [])]),
-  ).slice(-50_000);
-}
-
-function sanitizeData(data, username) {
-  if (!data || typeof data !== "object" || Array.isArray(data)) return {};
-  const safe = structuredClone(data);
-  if (safe.user && typeof safe.user === "object") {
-    safe.user = {
-      name: cleanText(safe.user.name, 80),
-      email: cleanText(safe.user.email, 120),
-      username: normalizeUsername(username || safe.user.username),
-      loggedInAt: cleanText(safe.user.loggedInAt, 40),
-    };
-  }
-  safe.tasks = (Array.isArray(safe.tasks) ? safe.tasks : []).slice(0, 1000);
-  safe.instances = Object.fromEntries(
-    Object.entries(
-      safe.instances && typeof safe.instances === "object" && !Array.isArray(safe.instances)
-        ? safe.instances
-        : {},
-    )
-      .filter(([id, item]) => cleanId(id) && item && typeof item === "object")
-      .slice(-50_000),
-  );
-  safe.settings = safe.settings && typeof safe.settings === "object" ? safe.settings : {};
-  safe.settings.snapshots = (Array.isArray(safe.settings.snapshots)
-    ? safe.settings.snapshots
-    : []
-  ).slice(0, 30);
-  safe.meta = safe.meta && typeof safe.meta === "object" ? safe.meta : {};
-  safe.meta.taskTombstones = sanitizeTimestampMap(safe.meta.taskTombstones);
-  safe.meta.instanceTombstones = sanitizeTimestampMap(safe.meta.instanceTombstones);
-  delete safe.imports;
-  return safe;
-}
-
-function sanitizeTimestampMap(value) {
-  return Object.fromEntries(
-    Object.entries(value && typeof value === "object" ? value : {})
-      .filter(
-        ([id, timestamp]) =>
-          cleanId(id) && Number.isFinite(new Date(String(timestamp || "")).getTime()),
-      )
-      .slice(-50_000),
-  );
-}
-
-function buildSummary(data) {
-  const tasks = Array.isArray(data?.tasks) ? data.tasks : [];
-  const instances =
-    data?.instances && typeof data.instances === "object" ? Object.values(data.instances) : [];
-  return {
-    taskSettingsCount: tasks.length,
-    taskRecordsCount: instances.length,
-    completedCount: instances.filter((item) => item?.status === "completed").length,
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-function validateNewAccount({ username, password, name, email }) {
-  if (!/^[\p{L}\p{N}._-]{3,50}$/u.test(username)) {
-    return "اسم المستخدم يجب أن يكون من 3 إلى 50 حرفًا دون مسافات";
-  }
-  if (password.length < 8 || password.length > 128) {
-    return "كلمة المرور يجب أن تكون بين 8 و128 حرفًا";
-  }
-  if (!name) return "الاسم مطلوب";
-  if (!isValidEmail(email)) return "البريد الإلكتروني غير صالح";
-  return "";
-}
-
-function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanText(value, 120));
-}
-
-function requestAttemptKey(request, username) {
-  const forwarded = String(request.headers["x-forwarded-for"] || "").split(",")[0].trim();
-  return `${forwarded || request.socket.remoteAddress || "unknown"}:${username}`;
-}
-
-function isRateLimited(key) {
+function isRateLimited(ip) {
   const cutoff = Date.now() - 15 * 60_000;
-  const attempts = (loginAttempts.get(key) || []).filter((time) => time >= cutoff);
-  if (attempts.length) loginAttempts.set(key, attempts);
-  return attempts.length >= 8;
+  const attempts = (loginAttempts.get(ip) || []).filter((time) => time > cutoff);
+  loginAttempts.set(ip, attempts);
+  return attempts.length >= 6;
 }
 
-function recordFailedAttempt(key) {
-  const attempts = loginAttempts.get(key) || [];
-  attempts.push(Date.now());
-  loginAttempts.set(key, attempts.slice(-8));
+function recordFailure(ip) {
+  loginAttempts.set(ip, [...(loginAttempts.get(ip) || []), Date.now()].slice(-6));
 }
 
-function clearAttempts(key) {
-  loginAttempts.delete(key);
+function clearFailures(ip) {
+  loginAttempts.delete(ip);
 }
 
-async function serveStaticFile(request, response, pathname) {
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    return sendText(response, 405, "Method not allowed", { Allow: "GET, HEAD" });
-  }
-
-  const requestedPath = pathname === "/" ? "/index.html" : pathname;
-  if (!publicFiles.has(requestedPath)) return sendText(response, 404, "Not found");
-  const filePath = path.join(rootDir, requestedPath.slice(1));
-  const relative = path.relative(rootDir, filePath);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    return sendText(response, 403, "Forbidden");
-  }
-
-  let info;
-  try {
-    info = await stat(filePath);
-  } catch {
-    return sendText(response, 404, "Not found");
-  }
-  if (!info.isFile()) return sendText(response, 404, "Not found");
-
-  response.writeHead(200, {
-    ...securityHeaders,
-    "Content-Type": contentType(path.extname(filePath)),
-    "Content-Length": info.size,
-    "Cache-Control": cacheControl(filePath),
-  });
-  if (request.method === "HEAD") return response.end();
-  createReadStream(filePath).pipe(response);
+function clientIp(request) {
+  return String(request.headers["x-forwarded-for"] || request.socket.remoteAddress || "")
+    .split(",")[0]
+    .trim()
+    .slice(0, 80);
 }
 
-async function serveBundledAppScript(request, response) {
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    return sendText(response, 405, "Method not allowed", { Allow: "GET, HEAD" });
-  }
-  const encoded = await readFile(path.join(rootDir, "app.js.br.b64"), "utf8");
-  const content = brotliDecompressSync(Buffer.from(encoded.replace(/\s+/g, ""), "base64"));
-  response.writeHead(200, {
-    ...securityHeaders,
-    "Content-Type": "text/javascript; charset=utf-8",
-    "Content-Length": content.length,
-    "Cache-Control": "no-cache",
-  });
-  if (request.method === "HEAD") return response.end();
-  response.end(content);
+function isMutation(method) {
+  return ["POST", "PATCH", "PUT", "DELETE"].includes(method || "");
 }
 
-function getPool() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL غير موجود. اربط قاعدة Render PostgreSQL بالخدمة.");
-  }
-  if (!pool) {
-    const connectionString = process.env.DATABASE_URL;
-    const config = {
-      connectionString,
-      max: Math.min(20, Math.max(1, Number(process.env.PG_POOL_MAX || 5))),
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
-    };
-    if (shouldUseSsl(connectionString)) config.ssl = { rejectUnauthorized: false };
-    pool = new Pool(config);
-    pool.on("error", (error) => console.error("Database pool error", error));
-  }
-  return pool;
-}
-
-function shouldUseSsl(connectionString) {
-  if (process.env.DATABASE_SSL) {
-    return /^(1|true|yes|required)$/i.test(process.env.DATABASE_SSL);
-  }
-  return /sslmode=require/i.test(connectionString) || /\.render\.com/i.test(connectionString);
-}
-
-function ensureSchema() {
-  if (!schemaReady) {
-    schemaReady = getPool()
-      .query(`
-        CREATE TABLE IF NOT EXISTS accounts (
-          username TEXT PRIMARY KEY,
-          name TEXT NOT NULL DEFAULT '',
-          email TEXT NOT NULL DEFAULT '',
-          salt TEXT NOT NULL,
-          password_hash TEXT NOT NULL,
-          data JSONB NOT NULL DEFAULT '{}'::jsonb,
-          summary JSONB NOT NULL DEFAULT '{}'::jsonb,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS account_sessions (
-          token_hash TEXT PRIMARY KEY,
-          username TEXT NOT NULL REFERENCES accounts(username) ON DELETE CASCADE ON UPDATE CASCADE,
-          expires_at TIMESTAMPTZ NOT NULL,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-
-        CREATE INDEX IF NOT EXISTS account_sessions_username_idx ON account_sessions(username);
-        CREATE INDEX IF NOT EXISTS account_sessions_expiry_idx ON account_sessions(expires_at);
-      `)
-      .catch((error) => {
-        schemaReady = null;
-        throw error;
-      });
-  }
-  return schemaReady;
-}
-
-async function readAccount(username) {
-  const result = await getPool().query(
-    `SELECT username, name, email, salt, password_hash, data, summary, created_at, updated_at
-       FROM accounts
-      WHERE username = $1`,
-    [normalizeUsername(username)],
-  );
-  return result.rows[0] ? mapAccount(result.rows[0]) : null;
-}
-
-async function upsertAccount(account) {
-  await getPool().query(
-    `INSERT INTO accounts (
-       username, name, email, salt, password_hash, data, summary, created_at, updated_at
-     ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)
-     ON CONFLICT (username) DO UPDATE SET
-       name = EXCLUDED.name,
-       email = EXCLUDED.email,
-       salt = EXCLUDED.salt,
-       password_hash = EXCLUDED.password_hash,
-       data = EXCLUDED.data,
-       summary = EXCLUDED.summary,
-       updated_at = EXCLUDED.updated_at`,
-    [
-      account.username,
-      account.name,
-      account.email,
-      account.salt,
-      account.passwordHash,
-      JSON.stringify(account.data),
-      JSON.stringify(account.summary),
-      account.createdAt,
-      account.updatedAt,
-    ],
-  );
-}
-
-function mapAccount(row) {
-  return {
-    username: row.username,
-    name: row.name,
-    email: row.email,
-    salt: row.salt,
-    passwordHash: row.password_hash,
-    data: row.data || null,
-    summary: row.summary || null,
-    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
-    updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
-  };
-}
-
-function publicResponse(account, token) {
-  return {
-    user: {
-      username: account.username,
-      name: account.name,
-      email: account.email,
-      createdAt: account.createdAt,
-      updatedAt: account.updatedAt,
-    },
-    data: account.data || null,
-    ...(token ? { token } : {}),
-  };
-}
-
-async function runMaintenanceTasks() {
-  if (!process.env.DATABASE_URL) return;
-  await ensureSchema();
-
-  const deleteUsers = splitEnvList(process.env.DELETE_ACCOUNT_NOW);
-  for (const username of deleteUsers) {
-    await getPool().query(`DELETE FROM accounts WHERE username = $1`, [normalizeUsername(username)]);
-  }
-
-  for (const [username, newPassword] of parseEnvPairs(process.env.CHANGE_PASSWORD)) {
-    if (!newPassword) continue;
-    const salt = crypto.randomBytes(16).toString("hex");
-    const passwordHash = await hashPassword(newPassword, salt);
-    await getPool().query(
-      `UPDATE accounts SET salt = $2, password_hash = $3, updated_at = NOW() WHERE username = $1`,
-      [normalizeUsername(username), salt, passwordHash],
-    );
-    await getPool().query(`DELETE FROM account_sessions WHERE username = $1`, [
-      normalizeUsername(username),
-    ]);
-  }
-
-  for (const [oldUsername, newUsername] of parseEnvPairs(process.env.CHANGE_USERNAME)) {
-    const oldValue = normalizeUsername(oldUsername);
-    const newValue = normalizeUsername(newUsername);
-    if (oldValue && /^[\p{L}\p{N}._-]{3,50}$/u.test(newValue)) {
-      await getPool().query(`UPDATE accounts SET username = $2, updated_at = NOW() WHERE username = $1`, [
-        oldValue,
-        newValue,
-      ]);
-    }
-  }
-
-  for (const [username, name] of parseEnvPairs(process.env.CHANGE_NAME)) {
-    await getPool().query(`UPDATE accounts SET name = $2, updated_at = NOW() WHERE username = $1`, [
-      normalizeUsername(username),
-      cleanText(name, 80),
-    ]);
-  }
-
-  for (const [username, email] of parseEnvPairs(process.env.CHANGE_EMAIL)) {
-    await getPool().query(`UPDATE accounts SET email = $2, updated_at = NOW() WHERE username = $1`, [
-      normalizeUsername(username),
-      cleanText(email, 120),
-    ]);
-  }
-}
-
-function splitEnvList(value) {
-  return String(value || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function parseEnvPairs(value) {
-  return splitEnvList(value)
-    .map((item) => {
-      const separator = item.indexOf(":");
-      return separator > 0
-        ? [item.slice(0, separator).trim(), item.slice(separator + 1).trim()]
-        : null;
-    })
-    .filter(Boolean);
-}
-
-async function readJsonBody(request) {
-  const contentTypeValue = String(request.headers["content-type"] || "");
-  if (!contentTypeValue.toLowerCase().startsWith("application/json")) {
-    const error = new Error("نوع المحتوى يجب أن يكون JSON");
-    error.status = 415;
-    throw error;
-  }
-
+async function readJson(request) {
   const chunks = [];
-  let total = 0;
+  let size = 0;
   for await (const chunk of request) {
-    total += chunk.length;
-    if (total > maxBodyBytes) {
-      const error = new Error("حجم الطلب أكبر من المسموح");
-      error.status = 413;
-      throw error;
-    }
+    size += chunk.length;
+    if (size > 256 * 1024) throw new Error("الطلب أكبر من الحد المسموح");
     chunks.push(chunk);
   }
   if (!chunks.length) return {};
   try {
     return JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch {
-    const error = new Error("صيغة JSON غير صالحة");
-    error.status = 400;
-    throw error;
+    throw new Error("صيغة JSON غير صالحة");
   }
 }
 
-function handleApiError(response, label, error) {
-  console.error(label, error);
-  const status = Number(error?.status);
-  if ([400, 413, 415].includes(status)) {
-    return sendJson(response, status, { error: cleanText(error.message, 180) });
+async function serveStatic(request, response, pathname) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return sendText(response, 405, "Method not allowed");
   }
-  return sendJson(response, 500, { error: "تعذر إكمال الطلب الآن" });
-}
-
-function cleanText(value, max = 240) {
-  return String(value || "").trim().slice(0, max);
-}
-
-function cleanId(value) {
-  const id = String(value || "");
-  return /^[a-zA-Z0-9._:-]{1,240}$/.test(id) ? id : "";
-}
-
-function normalizeUsername(value) {
-  return cleanText(value, 50).toLocaleLowerCase("ar-SA");
-}
-
-function sendJson(response, status, body, headers = {}) {
-  response.writeHead(status, { ...jsonHeaders, ...securityHeaders, ...headers });
-  response.end(JSON.stringify(body));
-}
-
-function sendText(response, status, body, headers = {}) {
-  response.writeHead(status, {
+  const requested = pathname === "/" ? "/index.html" : pathname;
+  if (!staticFiles.has(requested)) return sendText(response, 404, "Not found");
+  const filePath = path.join(rootDir, requested.slice(1));
+  const info = await stat(filePath).catch(() => null);
+  if (!info?.isFile()) return sendText(response, 404, "Not found");
+  response.writeHead(200, {
     ...securityHeaders,
-    "Content-Type": "text/plain; charset=utf-8",
-    ...headers,
+    "Content-Type": contentType(path.extname(filePath)),
+    "Content-Length": info.size,
+    "Cache-Control": requested === "/index.html" ? "no-cache" : "public, max-age=3600",
   });
-  response.end(body);
+  if (request.method === "HEAD") return response.end();
+  createReadStream(filePath).pipe(response);
 }
 
 function contentType(extension) {
@@ -1153,14 +755,26 @@ function contentType(extension) {
     ".html": "text/html; charset=utf-8",
     ".css": "text/css; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
-    ".mjs": "text/javascript; charset=utf-8",
     ".svg": "image/svg+xml",
-  }[extension.toLowerCase()] || "application/octet-stream";
+  }[extension] || "application/octet-stream";
 }
 
-function cacheControl(filePath) {
-  const name = path.basename(filePath);
-  return ["index.html", "app.js", "core.mjs", "styles.css", "sw.js"].includes(name)
-    ? "no-cache"
-    : "public, max-age=3600";
+function sendJson(response, status, value) {
+  const body = JSON.stringify(value);
+  response.writeHead(status, {
+    ...securityHeaders,
+    "Cache-Control": "no-store",
+    "Content-Type": "application/json; charset=utf-8",
+    "Content-Length": Buffer.byteLength(body),
+  });
+  response.end(body);
 }
+
+function sendText(response, status, value) {
+  response.writeHead(status, {
+    ...securityHeaders,
+    "Content-Type": "text/plain; charset=utf-8",
+  });
+  response.end(value);
+}
+

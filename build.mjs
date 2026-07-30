@@ -1,71 +1,62 @@
-import { access, readFile, writeFile } from "node:fs/promises";
-import { brotliCompressSync } from "node:zlib";
+import { access, writeFile } from "node:fs/promises";
 import { icons } from "lucide";
 
-const requiredFiles = ["index.html", "styles.css", "app.js", "core.mjs", "server.mjs"];
-
-await Promise.all(requiredFiles.map((file) => access(file)));
-
-const js = await readFile("app.js");
-const compressed = brotliCompressSync(js);
-await writeFile("app.js.br.b64", compressed.toString("base64"));
+await Promise.all(
+  ["server.mjs", "core.mjs", "public/index.html", "public/app.js", "public/styles.css"].map((file) =>
+    access(file),
+  ),
+);
 
 const selectedIcons = {
-  "arrow-left-right": icons.ArrowLeftRight,
-  "badge-alert": icons.BadgeAlert,
-  "circle-check": icons.CircleCheck,
-  "circle-x": icons.CircleX,
-  "key-round": icons.KeyRound,
+  activity: icons.Activity,
+  archive: icons.Archive,
+  "arrow-right": icons.ArrowRight,
+  "bar-chart-3": icons.ChartNoAxesColumn,
+  "check-circle-2": icons.CircleCheck,
+  database: icons.Database,
+  download: icons.Download,
+  eye: icons.Eye,
+  file: icons.FileText,
+  gauge: icons.Gauge,
+  key: icons.KeyRound,
   "layout-dashboard": icons.LayoutDashboard,
-  "list-checks": icons.ListChecks,
-  "lock-keyhole": icons.LockKeyhole,
   "log-out": icons.LogOut,
-  pencil: icons.Pencil,
-  plus: icons.Plus,
-  "refresh-cw": icons.RefreshCw,
-  "rotate-ccw": icons.RotateCcw,
+  menu: icons.Menu,
+  refresh: icons.RefreshCw,
   search: icons.Search,
-  "settings-2": icons.Settings2,
-  "shield-check": icons.ShieldCheck,
+  server: icons.Server,
+  settings: icons.Settings2,
+  shield: icons.ShieldCheck,
   "trash-2": icons.Trash2,
-  "user-round": icons.UserRound,
+  user: icons.UserRound,
+  users: icons.UsersRound,
+  x: icons.X,
 };
 
-const iconRuntime = `(() => {
+const runtime = `(() => {
   const icons = ${JSON.stringify(selectedIcons)};
-  const namespace = "http://www.w3.org/2000/svg";
-  function createIcons(options = {}) {
-    const shared = options.attrs || {};
-    document.querySelectorAll("i[data-lucide]").forEach((placeholder) => {
-      const name = placeholder.getAttribute("data-lucide");
-      const nodes = icons[name];
+  const ns = "http://www.w3.org/2000/svg";
+  function createIcons() {
+    document.querySelectorAll("i[data-lucide]").forEach((holder) => {
+      const nodes = icons[holder.dataset.lucide];
       if (!nodes) return;
-      const svg = document.createElementNS(namespace, "svg");
-      const attributes = {
-        width: "24",
-        height: "24",
-        viewBox: "0 0 24 24",
-        fill: "none",
-        stroke: "currentColor",
-        "stroke-width": "2",
-        "stroke-linecap": "round",
-        "stroke-linejoin": "round",
-        ...shared,
-      };
-      Object.entries(attributes).forEach(([key, value]) => svg.setAttribute(key, value));
-      svg.setAttribute("data-lucide", name);
-      if (placeholder.getAttribute("aria-hidden")) svg.setAttribute("aria-hidden", "true");
+      const svg = document.createElementNS(ns, "svg");
+      Object.entries({
+        width: "20", height: "20", viewBox: "0 0 24 24", fill: "none",
+        stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round",
+        "stroke-linejoin": "round", "aria-hidden": "true"
+      }).forEach(([key, value]) => svg.setAttribute(key, value));
       nodes.forEach(([tag, attrs]) => {
-        const child = document.createElementNS(namespace, tag);
-        Object.entries(attrs).forEach(([key, value]) => child.setAttribute(key, value));
-        svg.appendChild(child);
+        const node = document.createElementNS(ns, tag);
+        Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+        svg.appendChild(node);
       });
-      placeholder.replaceWith(svg);
+      holder.replaceWith(svg);
     });
   }
   globalThis.lucide = { createIcons };
 })();`;
 
-await writeFile("lucide.js", iconRuntime);
+await writeFile("public/lucide.js", runtime);
+console.log("EF3L Control build complete");
 
-console.log("Render build complete");

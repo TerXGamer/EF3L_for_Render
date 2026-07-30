@@ -1,195 +1,52 @@
-const DAY_MS = 86_400_000;
-const VALID_STATUSES = new Set([
-  "main",
-  "requiredOverdue",
-  "optionalOverdue",
-  "never",
-  "completed",
-]);
-
-function dateParts(value) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const candidate = new Date(Date.UTC(year, month - 1, day));
-  if (
-    candidate.getUTCFullYear() !== year ||
-    candidate.getUTCMonth() !== month - 1 ||
-    candidate.getUTCDate() !== day
-  ) {
-    return null;
-  }
-  return { year, month, day };
+export function normalizeUsername(value) {
+  return String(value || "").trim().toLocaleLowerCase("en-US").slice(0, 50);
 }
 
-function isoFromUtcDate(date) {
-  return date.toISOString().slice(0, 10);
+export function pagination(inputLimit, inputOffset) {
+  const limit = Math.min(100, Math.max(1, Number.parseInt(inputLimit, 10) || 20));
+  const offset = Math.max(0, Number.parseInt(inputOffset, 10) || 0);
+  return { limit, offset };
 }
 
-function lastDayOfMonth(year, month) {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+export function safeAccountData(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? structuredClone(value) : {};
 }
 
-export function todayISO(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-export function parseLocalDate(value) {
-  const parts = dateParts(value);
-  if (!parts) return new Date(Number.NaN);
-  return new Date(parts.year, parts.month - 1, parts.day);
-}
-
-export function addDays(value, amount) {
-  const parts = dateParts(value);
-  if (!parts) return "";
-  const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
-  date.setUTCDate(date.getUTCDate() + Number(amount || 0));
-  return isoFromUtcDate(date);
-}
-
-export function daysBetween(start, end) {
-  const first = dateParts(start);
-  const second = dateParts(end);
-  if (!first || !second) return Number.NaN;
-  const firstTime = Date.UTC(first.year, first.month - 1, first.day);
-  const secondTime = Date.UTC(second.year, second.month - 1, second.day);
-  return Math.round((secondTime - firstTime) / DAY_MS);
-}
-
-export function forEachDate(start, end, callback) {
-  if (!dateParts(start) || !dateParts(end) || start > end) return;
-  let current = start;
-  while (current <= end) {
-    callback(current);
-    current = addDays(current, 1);
-  }
-}
-
-export function rangeDates(start, end) {
-  const dates = [];
-  forEachDate(start, end, (date) => dates.push(date));
-  return dates;
-}
-
-export function maxDate(a, b) {
-  return a > b ? a : b;
-}
-
-export function timeToMinutes(value) {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(String(value || ""));
-  if (!match) return 0;
-  const hours = Math.min(23, Math.max(0, Number(match[1])));
-  const minutes = Math.min(59, Math.max(0, Number(match[2])));
-  return hours * 60 + minutes;
-}
-
-export function minutesToTime(value) {
-  const total = Math.max(0, Math.min(1439, Math.round(Number(value) || 0)));
-  const hour = Math.floor(total / 60);
-  const minute = total % 60;
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-}
-
-export function mapTimeIntoWindow(time, window) {
-  if (!window?.enabled) return time;
-  const start = timeToMinutes(window.start);
-  const end = timeToMinutes(window.end);
-  if (end <= start) return time;
-  const ratio = timeToMinutes(time) / 1439;
-  return minutesToTime(start + ratio * (end - start));
-}
-
-export function isTaskDueOn(task, date) {
-  if (!task?.startDate || !date || date < task.startDate) return false;
-  const diff = daysBetween(task.startDate, date);
-  if (!Number.isFinite(diff) || diff < 0) return false;
-  if (task.recurrence === "once") return diff === 0;
-  if (task.recurrence === "daily") return true;
-  if (task.recurrence === "weekly") return diff % 7 === 0;
-  if (task.recurrence === "custom") {
-    return diff % Math.max(1, Number(task.intervalDays) || 1) === 0;
-  }
-  if (task.recurrence === "monthly") {
-    const anchor = dateParts(task.startDate);
-    const current = dateParts(date);
-    if (!anchor || !current) return false;
-    return current.day === Math.min(anchor.day, lastDayOfMonth(current.year, current.month));
-  }
-  return false;
-}
-
-export function latestDueDateOnOrBefore(task, date) {
-  if (!task?.startDate || !date || date < task.startDate) return null;
-  if (task.recurrence === "once") return task.startDate;
-  if (task.recurrence === "daily") return date;
-
-  const diff = daysBetween(task.startDate, date);
-  if (!Number.isFinite(diff) || diff < 0) return null;
-  if (task.recurrence === "weekly" || task.recurrence === "custom") {
-    const interval = task.recurrence === "weekly" ? 7 : Math.max(1, Number(task.intervalDays) || 1);
-    return addDays(date, -(diff % interval));
-  }
-
-  if (task.recurrence === "monthly") {
-    const anchor = dateParts(task.startDate);
-    const target = dateParts(date);
-    if (!anchor || !target) return null;
-    let year = target.year;
-    let month = target.month;
-    let candidate = `${year}-${String(month).padStart(2, "0")}-${String(
-      Math.min(anchor.day, lastDayOfMonth(year, month)),
-    ).padStart(2, "0")}`;
-    if (candidate > date) {
-      month -= 1;
-      if (month === 0) {
-        month = 12;
-        year -= 1;
-      }
-      candidate = `${year}-${String(month).padStart(2, "0")}-${String(
-        Math.min(anchor.day, lastDayOfMonth(year, month)),
-      ).padStart(2, "0")}`;
-    }
-    return candidate >= task.startDate ? candidate : null;
-  }
-
-  return null;
-}
-
-export function wouldCreateDependencyCycle(tasks, taskId, dependencyId) {
-  if (!taskId || !dependencyId) return false;
-  if (taskId === dependencyId) return true;
-  const dependencyByTask = new Map((tasks || []).map((task) => [task.id, task.dependencyId || ""]));
-  dependencyByTask.set(taskId, dependencyId);
-  const visited = new Set();
-  let current = dependencyId;
-  while (current) {
-    if (current === taskId || visited.has(current)) return true;
-    visited.add(current);
-    current = dependencyByTask.get(current) || "";
-  }
-  return false;
-}
-
-export function calculateStats(items) {
-  const eligible = (items || []).filter((item) => item && VALID_STATUSES.has(item.status));
-  const completed = eligible.filter((item) => item.status === "completed").length;
-  const pending = eligible.filter((item) => item.status === "main").length;
-  const missed = Math.max(0, eligible.length - completed - pending);
-  const decided = completed + missed;
-  const rate = decided ? Math.round((completed / decided) * 100) : 0;
+export function summarizeData(value) {
+  const data = safeAccountData(value);
+  const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+  const instances =
+    data.instances && typeof data.instances === "object" && !Array.isArray(data.instances)
+      ? Object.values(data.instances)
+      : [];
   return {
-    total: eligible.length,
-    completed,
-    pending,
-    missed,
-    decided,
-    rate,
-    items: eligible,
+    taskSettingsCount: tasks.length,
+    taskRecordsCount: instances.length,
+    completedCount: instances.filter((item) => item?.status === "completed").length,
+    deletedCount: instances.filter((item) => item?.status === "deleted").length,
+    updatedAt: new Date().toISOString(),
   };
 }
+
+export function formatBytes(bytes) {
+  const value = Math.max(0, Number(bytes) || 0);
+  if (value < 1024) return `${value} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let size = value;
+  let unit = "B";
+  for (const next of units) {
+    size /= 1024;
+    unit = next;
+    if (size < 1024) break;
+  }
+  return `${size >= 100 ? size.toFixed(0) : size >= 10 ? size.toFixed(1) : size.toFixed(2)} ${unit}`;
+}
+
+export function accountDataSection(dataInput, section) {
+  const data = safeAccountData(dataInput);
+  const allowed = new Set(["user", "settings", "meta", "sync", "summary"]);
+  if (allowed.has(section)) return data[section] ?? null;
+  const { tasks: _tasks, instances: _instances, ...rest } = data;
+  return rest;
+}
+

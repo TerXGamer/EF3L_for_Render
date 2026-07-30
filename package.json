@@ -1,5 +1,5 @@
 {
-  "name": "ifal-for-render",
+  "name": "ef3l-admin-control",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -9,10 +9,11 @@
     "test": "node --test"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20 <27"
   },
   "dependencies": {
     "lucide": "^1.28.0",
     "pg": "^8.16.3"
   }
 }
+

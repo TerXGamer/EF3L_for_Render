@@ -24,6 +24,7 @@ const selectedIcons = {
   plus: icons.Plus,
   "refresh-cw": icons.RefreshCw,
   "rotate-ccw": icons.RotateCcw,
+  search: icons.Search,
   "settings-2": icons.Settings2,
   "shield-check": icons.ShieldCheck,
   "trash-2": icons.Trash2,

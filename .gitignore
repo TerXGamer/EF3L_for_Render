@@ -1,5 +1,6 @@
 node_modules/
 .env
 .env.*
-*.log
-lucide.js
+!.env.example
+npm-debug.log*
+

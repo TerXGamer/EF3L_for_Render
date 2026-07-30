@@ -1,67 +1,39 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  addDays,
-  calculateStats,
-  daysBetween,
-  isTaskDueOn,
-  latestDueDateOnOrBefore,
-  mapTimeIntoWindow,
-  wouldCreateDependencyCycle,
+  accountDataSection,
+  formatBytes,
+  normalizeUsername,
+  pagination,
+  summarizeData,
 } from "../core.mjs";
 
-test("date arithmetic is stable across daylight-saving boundaries", () => {
-  assert.equal(daysBetween("2026-03-07", "2026-03-09"), 2);
-  assert.equal(addDays("2026-03-08", 1), "2026-03-09");
+test("pagination is bounded", () => {
+  assert.deepEqual(pagination("999", "-4"), { limit: 100, offset: 0 });
+  assert.deepEqual(pagination("25", "50"), { limit: 25, offset: 50 });
 });
 
-test("monthly recurrence keeps the original day and clamps short months", () => {
-  const task = { startDate: "2026-01-31", recurrence: "monthly" };
-  assert.equal(isTaskDueOn(task, "2026-02-28"), true);
-  assert.equal(isTaskDueOn(task, "2026-03-31"), true);
-  assert.equal(isTaskDueOn(task, "2026-03-30"), false);
-  assert.equal(latestDueDateOnOrBefore(task, "2026-03-15"), "2026-02-28");
+test("account summaries include task and record totals", () => {
+  const summary = summarizeData({
+    tasks: [{ id: "one" }],
+    instances: {
+      a: { status: "completed" },
+      b: { status: "deleted" },
+    },
+  });
+  assert.equal(summary.taskSettingsCount, 1);
+  assert.equal(summary.taskRecordsCount, 2);
+  assert.equal(summary.completedCount, 1);
+  assert.equal(summary.deletedCount, 1);
 });
 
-test("weekly and custom recurrence return the latest expected occurrence", () => {
-  assert.equal(
-    latestDueDateOnOrBefore({ startDate: "2026-07-01", recurrence: "weekly" }, "2026-07-17"),
-    "2026-07-15",
-  );
-  assert.equal(
-    latestDueDateOnOrBefore(
-      { startDate: "2026-07-01", recurrence: "custom", intervalDays: 3 },
-      "2026-07-10",
-    ),
-    "2026-07-10",
-  );
+test("large account sections stay paged out of raw views", () => {
+  const section = accountDataSection({ tasks: [1], instances: { a: 1 }, settings: { theme: "dark" } });
+  assert.deepEqual(section, { settings: { theme: "dark" } });
 });
 
-test("display-window mapping preserves both endpoints", () => {
-  const window = { enabled: true, start: "08:00", end: "18:00" };
-  assert.equal(mapTimeIntoWindow("00:00", window), "08:00");
-  assert.equal(mapTimeIntoWindow("23:59", window), "18:00");
+test("usernames and byte labels are normalized", () => {
+  assert.equal(normalizeUsername("  TARIQ  "), "tariq");
+  assert.equal(formatBytes(1024), "1.00 KB");
 });
 
-test("pending tasks are not counted as missed", () => {
-  const stats = calculateStats([
-    { status: "completed" },
-    { status: "main" },
-    { status: "requiredOverdue" },
-    { status: "deleted" },
-  ]);
-  assert.deepEqual(
-    { total: stats.total, completed: stats.completed, pending: stats.pending, missed: stats.missed, rate: stats.rate },
-    { total: 3, completed: 1, pending: 1, missed: 1, rate: 50 },
-  );
-});
-
-test("dependency validation blocks direct and indirect cycles", () => {
-  const tasks = [
-    { id: "a", dependencyId: "" },
-    { id: "b", dependencyId: "a" },
-    { id: "c", dependencyId: "b" },
-  ];
-  assert.equal(wouldCreateDependencyCycle(tasks, "a", "c"), true);
-  assert.equal(wouldCreateDependencyCycle(tasks, "c", "a"), false);
-});

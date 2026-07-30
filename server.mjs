@@ -50,10 +50,7 @@ const server = createServer(async (request, response) => {
     const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
 
     if (url.pathname === "/health") {
-      return sendJson(response, 200, {
-        ok: true,
-        databaseConfigured: Boolean(process.env.DATABASE_URL),
-      });
+      return handleHealthRequest(response);
     }
 
     if (accountPaths.has(url.pathname)) {
@@ -95,6 +92,31 @@ function parseAdminSet() {
 
 function isAdminUser(username) {
   return parseAdminSet().includes(normalizeUsername(username));
+}
+
+async function handleHealthRequest(response) {
+  if (!process.env.DATABASE_URL) {
+    return sendJson(response, 503, {
+      ok: false,
+      databaseConfigured: false,
+      databaseConnected: false,
+    });
+  }
+
+  try {
+    await getPool().query("SELECT 1");
+    return sendJson(response, 200, {
+      ok: true,
+      databaseConfigured: true,
+      databaseConnected: true,
+    });
+  } catch {
+    return sendJson(response, 503, {
+      ok: false,
+      databaseConfigured: true,
+      databaseConnected: false,
+    });
+  }
 }
 
 function currentMonthRange() {
@@ -317,14 +339,20 @@ async function handleAdminRequest(request, response) {
     }
 
     if (body.action === "list") {
-      const result = await getPool().query(`SELECT username FROM accounts ORDER BY LOWER(username) ASC`);
-      return sendJson(response, 200, { users: result.rows.map((row) => row.username) });
+      const result = await getPool().query(
+        `SELECT username, name, email, summary, created_at, updated_at
+           FROM accounts
+          ORDER BY LOWER(username) ASC`,
+      );
+      return sendJson(response, 200, {
+        users: result.rows.map((row) => adminUserSummary(row)),
+      });
     }
 
     if (body.action === "reveal") {
       const targetUsername = normalizeUsername(body.targetUsername);
       if (!targetUsername) {
-        return sendJson(response, 400, { error: "اسم المستخدم المطلوب كشفه غير صالح" });
+        return sendJson(response, 400, { error: "اسم المستخدم المطلوب إدارته غير صالح" });
       }
       const target = await readAccount(targetUsername);
       if (!target) return sendJson(response, 404, { error: "المستخدم غير موجود" });
@@ -332,10 +360,135 @@ async function handleAdminRequest(request, response) {
       return sendJson(response, 200, buildAdminRevealReport(target, monthStart, monthEnd, monthLabel));
     }
 
+    if (body.action === "update-user") {
+      const targetUsername = normalizeUsername(body.targetUsername);
+      const target = targetUsername ? await readAccount(targetUsername) : null;
+      if (!target) return sendJson(response, 404, { error: "المستخدم غير موجود" });
+
+      const name = cleanText(body.name, 80);
+      const email = cleanText(body.email, 120).toLocaleLowerCase("en-US");
+      if (!name) return sendJson(response, 400, { error: "اسم الحساب مطلوب" });
+      if (!isValidEmail(email)) {
+        return sendJson(response, 400, { error: "البريد الإلكتروني غير صالح" });
+      }
+
+      const nextData =
+        target.data && typeof target.data === "object" && !Array.isArray(target.data)
+          ? structuredClone(target.data)
+          : {};
+      nextData.user = {
+        ...(nextData.user && typeof nextData.user === "object" ? nextData.user : {}),
+        username: target.username,
+        name,
+        email,
+      };
+
+      const result = await getPool().query(
+        `UPDATE accounts
+            SET name = $2, email = $3, data = $4::jsonb, updated_at = NOW()
+          WHERE username = $1
+          RETURNING username, name, email, summary, created_at, updated_at`,
+        [target.username, name, email, JSON.stringify(nextData)],
+      );
+      logAdminAction(authenticated.account.username, "تعديل الحساب", target.username);
+      return sendJson(response, 200, {
+        ok: true,
+        user: adminUserSummary(result.rows[0]),
+      });
+    }
+
+    if (body.action === "reset-password") {
+      const targetUsername = normalizeUsername(body.targetUsername);
+      const newPassword = String(body.newPassword || "");
+      if (!targetUsername || !(await readAccount(targetUsername))) {
+        return sendJson(response, 404, { error: "المستخدم غير موجود" });
+      }
+      if (targetUsername === normalizeUsername(authenticated.account.username)) {
+        return sendJson(response, 400, {
+          error: "غيّر كلمة مرور حساب المدير من صفحة حسابي",
+        });
+      }
+      if (newPassword.length < 8 || newPassword.length > 128) {
+        return sendJson(response, 400, {
+          error: "كلمة المرور الجديدة يجب أن تكون بين 8 و128 حرفًا",
+        });
+      }
+
+      const salt = crypto.randomBytes(16).toString("hex");
+      const passwordHash = await hashPassword(newPassword, salt);
+      const client = await getPool().connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(
+          `UPDATE accounts SET salt = $2, password_hash = $3, updated_at = NOW()
+            WHERE username = $1`,
+          [targetUsername, salt, passwordHash],
+        );
+        await client.query(`DELETE FROM account_sessions WHERE username = $1`, [targetUsername]);
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+      logAdminAction(authenticated.account.username, "إعادة كلمة المرور", targetUsername);
+      return sendJson(response, 200, { ok: true });
+    }
+
+    if (body.action === "signout-user") {
+      const targetUsername = normalizeUsername(body.targetUsername);
+      if (!targetUsername || !(await readAccount(targetUsername))) {
+        return sendJson(response, 404, { error: "المستخدم غير موجود" });
+      }
+      if (targetUsername === normalizeUsername(authenticated.account.username)) {
+        return sendJson(response, 400, { error: "لا يمكن إنهاء جلستك من لوحة الإدارة" });
+      }
+      await getPool().query(`DELETE FROM account_sessions WHERE username = $1`, [targetUsername]);
+      logAdminAction(authenticated.account.username, "تسجيل خروج الحساب", targetUsername);
+      return sendJson(response, 200, { ok: true });
+    }
+
+    if (body.action === "delete-user") {
+      const targetUsername = normalizeUsername(body.targetUsername);
+      if (!targetUsername || !(await readAccount(targetUsername))) {
+        return sendJson(response, 404, { error: "المستخدم غير موجود" });
+      }
+      if (
+        targetUsername === normalizeUsername(authenticated.account.username) ||
+        isAdminUser(targetUsername)
+      ) {
+        return sendJson(response, 400, { error: "لا يمكن حذف حساب مدير من لوحة الإدارة" });
+      }
+      await getPool().query(`DELETE FROM accounts WHERE username = $1`, [targetUsername]);
+      logAdminAction(authenticated.account.username, "حذف الحساب", targetUsername);
+      return sendJson(response, 200, { ok: true });
+    }
+
     return sendJson(response, 400, { error: "طلب غير معروف" });
   } catch (error) {
     return handleApiError(response, "Admin API error", error);
   }
+}
+
+function adminUserSummary(row) {
+  const summary = row?.summary && typeof row.summary === "object" ? row.summary : {};
+  return {
+    username: normalizeUsername(row?.username),
+    name: cleanText(row?.name, 80),
+    email: cleanText(row?.email, 120),
+    isAdmin: isAdminUser(row?.username),
+    taskSettingsCount: Number(summary.taskSettingsCount || 0),
+    completedCount: Number(summary.completedCount || 0),
+    createdAt: row?.created_at instanceof Date ? row.created_at.toISOString() : row?.created_at || null,
+    updatedAt: row?.updated_at instanceof Date ? row.updated_at.toISOString() : row?.updated_at || null,
+  };
+}
+
+function logAdminAction(adminUsername, action, targetUsername) {
+  console.info(
+    `إجراء إداري: ${cleanText(action, 60)} | المدير=${normalizeUsername(adminUsername)} | الحساب=${normalizeUsername(targetUsername)}`,
+  );
 }
 
 function buildAdminRevealReport(account, monthStart, monthEnd, monthLabel) {
@@ -381,6 +534,7 @@ function buildAdminRevealReport(account, monthStart, monthEnd, monthLabel) {
       username: account.username,
       name: account.name,
       email: account.email,
+      isAdmin: isAdminUser(account.username),
       createdAt: account.createdAt,
       updatedAt: account.updatedAt,
       lastLogin,
@@ -660,8 +814,12 @@ function validateNewAccount({ username, password, name, email }) {
     return "كلمة المرور يجب أن تكون بين 8 و128 حرفًا";
   }
   if (!name) return "الاسم مطلوب";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "البريد الإلكتروني غير صالح";
+  if (!isValidEmail(email)) return "البريد الإلكتروني غير صالح";
   return "";
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanText(value, 120));
 }
 
 function requestAttemptKey(request, username) {

@@ -100,7 +100,7 @@
             <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button" data-view="account" type="button">حسابي</button>
             <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
-            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الإدارة</button>
           </div>
           <div class="settings-layout">
             <form class="form-panel" id="taskForm">
@@ -301,7 +301,7 @@
             <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button" data-view="account" type="button">حسابي</button>
             <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
-            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الإدارة</button>
           </div>
           <div class="stats-page-actions">
             <button class="primary-button" data-action="open-audit-stats" type="button">احصائيات مدققه</button>
@@ -345,7 +345,7 @@
             <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button" data-view="account" type="button">حسابي</button>
             <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
-            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الإدارة</button>
           </div>
           <section class="plain-panel">
             <div class="section-head audit-head">
@@ -393,7 +393,7 @@
             <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button" data-view="account" type="button">حسابي</button>
             <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
-            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الإدارة</button>
           </div>
           <section class="plain-panel">
             <div class="section-head">
@@ -418,19 +418,49 @@
             <button class="subnav-button active" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button" data-view="account" type="button">حسابي</button>
             <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
-            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الإدارة</button>
           </div>
           <section class="plain-panel">
             <div class="section-head"><h3>المظهر</h3><span></span></div>
-            <div class="form-row">
-              <label for="themeMode">شكل الموقع</label>
-              <select id="themeMode">
-                <option value="light">فاتح</option>
-                <option value="calm">هادئ</option>
-                <option value="dark">مظلم</option>
-                <option value="night">ليلي</option>
-              </select>
+            <div class="theme-grid" id="themeChoices" role="group" aria-label="ألوان الموقع">
+              <button class="theme-option" data-theme-value="light" type="button" aria-pressed="true">
+                <span class="theme-swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+                <strong>فاتح</strong>
+              </button>
+              <button class="theme-option" data-theme-value="calm" type="button" aria-pressed="false">
+                <span class="theme-swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+                <strong>هادئ</strong>
+              </button>
+              <button class="theme-option" data-theme-value="ocean" type="button" aria-pressed="false">
+                <span class="theme-swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+                <strong>بحري</strong>
+              </button>
+              <button class="theme-option" data-theme-value="rose" type="button" aria-pressed="false">
+                <span class="theme-swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+                <strong>وردي</strong>
+              </button>
+              <button class="theme-option" data-theme-value="dark" type="button" aria-pressed="false">
+                <span class="theme-swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+                <strong>داكن</strong>
+              </button>
+              <button class="theme-option" data-theme-value="graphite" type="button" aria-pressed="false">
+                <span class="theme-swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+                <strong>فحمي</strong>
+              </button>
+              <button class="theme-option" data-theme-value="night" type="button" aria-pressed="false">
+                <span class="theme-swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+                <strong>ليلي</strong>
+              </button>
             </div>
+            <select class="visually-hidden" id="themeMode" tabindex="-1" aria-hidden="true">
+              <option value="light">فاتح</option>
+              <option value="calm">هادئ</option>
+              <option value="ocean">بحري</option>
+              <option value="rose">وردي</option>
+              <option value="dark">داكن</option>
+              <option value="graphite">فحمي</option>
+              <option value="night">ليلي</option>
+            </select>
           </section>
         </section>
 
@@ -441,7 +471,7 @@
             <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button active" data-view="account" type="button">حسابي</button>
             <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
-            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الإدارة</button>
           </div>
           <div class="account-grid">
             <section class="plain-panel">
@@ -501,12 +531,21 @@
             <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button" data-view="account" type="button">حسابي</button>
             <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
-            <button class="subnav-button admin-only active" data-view="admin" type="button" hidden>الادمن</button>
+            <button class="subnav-button admin-only active" data-view="admin" type="button" hidden>الإدارة</button>
           </div>
           <section class="plain-panel">
             <div class="section-head">
-              <h3>مستخدمي الموقع</h3>
+              <h3>حسابات الموقع</h3>
               <span id="adminUserCount"></span>
+            </div>
+            <div class="admin-toolbar">
+              <label class="admin-search" for="adminSearch">
+                <i data-lucide="search" aria-hidden="true"></i>
+                <input id="adminSearch" type="search" placeholder="ابحث بالاسم أو المستخدم أو البريد" autocomplete="off" />
+              </label>
+              <button class="icon-button" id="adminRefresh" type="button" aria-label="تحديث الحسابات" title="تحديث الحسابات">
+                <i data-lucide="refresh-cw" aria-hidden="true"></i>
+              </button>
             </div>
             <div class="account-list compact-list" id="adminUserList"></div>
           </section>
@@ -519,14 +558,77 @@
             <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button" data-view="account" type="button">حسابي</button>
             <button class="subnav-button" data-view="reset" type="button">إعادة الضبط</button>
-            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الإدارة</button>
           </div>
           <section class="plain-panel">
             <div class="section-head">
-              <h3 id="adminRevealTitle">كشف</h3>
-              <button class="ghost-button" id="adminRevealBack" type="button">رجوع</button>
+              <h3 id="adminRevealTitle">إدارة الحساب</h3>
+              <button class="ghost-button" id="adminRevealBack" type="button">
+                <i data-lucide="arrow-left-right" aria-hidden="true"></i>
+                <span>رجوع</span>
+              </button>
             </div>
             <div class="admin-profile-grid" id="adminRevealProfile"></div>
+            <div class="admin-control-grid" id="adminControlPanel" hidden>
+              <form class="admin-control-panel" id="adminManageProfileForm">
+                <div class="section-head">
+                  <h3>بيانات الحساب</h3>
+                  <span></span>
+                </div>
+                <div class="form-grid two">
+                  <div class="form-row">
+                    <label for="adminManageName">الاسم</label>
+                    <input id="adminManageName" type="text" maxlength="80" required />
+                  </div>
+                  <div class="form-row">
+                    <label for="adminManageEmail">البريد الإلكتروني</label>
+                    <input id="adminManageEmail" type="email" maxlength="120" required />
+                  </div>
+                </div>
+                <div class="button-row">
+                  <button class="primary-button" type="submit">
+                    <i data-lucide="circle-check" aria-hidden="true"></i>
+                    <span>حفظ البيانات</span>
+                  </button>
+                </div>
+              </form>
+              <form class="admin-control-panel" id="adminManagePasswordForm">
+                <div class="section-head">
+                  <h3>كلمة المرور</h3>
+                  <span></span>
+                </div>
+                <div class="form-row">
+                  <label for="adminManagePassword">كلمة مرور جديدة</label>
+                  <input id="adminManagePassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required />
+                </div>
+                <div class="button-row">
+                  <button class="ghost-button" type="submit">
+                    <i data-lucide="key-round" aria-hidden="true"></i>
+                    <span>إعادة تعيين كلمة المرور</span>
+                  </button>
+                </div>
+              </form>
+              <section class="admin-control-panel admin-account-actions">
+                <div class="section-head">
+                  <h3>الجلسات والحساب</h3>
+                  <span></span>
+                </div>
+                <div class="button-row wrap">
+                  <button class="ghost-button" id="adminSignoutUser" type="button">
+                    <i data-lucide="log-out" aria-hidden="true"></i>
+                    <span>تسجيل خروجه من الأجهزة</span>
+                  </button>
+                  <button class="danger-button" id="adminDeleteUser" type="button">
+                    <i data-lucide="trash-2" aria-hidden="true"></i>
+                    <span>حذف الحساب</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+            <div class="section-head admin-tasks-heading">
+              <h3>سجل المهام</h3>
+              <span></span>
+            </div>
             <div class="admin-task-log" id="adminRevealTasks"></div>
           </section>
         </section>
@@ -538,7 +640,7 @@
             <button class="subnav-button" data-view="site" type="button">إعدادات الموقع</button>
             <button class="subnav-button" data-view="account" type="button">حسابي</button>
             <button class="subnav-button active" data-view="reset" type="button">إعادة الضبط</button>
-            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الادمن</button>
+            <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الإدارة</button>
           </div>
           <section class="plain-panel danger-zone">
             <div class="section-head"><h3>إعادة الضبط</h3><span></span></div>

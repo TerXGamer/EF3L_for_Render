@@ -37,8 +37,8 @@ const titles = {
   settingsHub: "الإعدادات",
   deleted: "المهام المحذوفة",
   reset: "إعادة الضبط",
-  admin: "الادمن",
-  adminReveal: "كشف",
+  admin: "لوحة الإدارة",
+  adminReveal: "إدارة الحساب",
 };
 
 const navParents = {
@@ -109,6 +109,9 @@ let completedSortMode = "newest";
 let selectedDataMonths = new Set();
 let isAdmin = false;
 let adminUsers = [];
+let adminUsersLoaded = false;
+let adminUsersLoading = false;
+let adminSearchTerm = "";
 let adminRevealTarget = "";
 let adminRevealData = null;
 let adminRevealLoading = false;
@@ -132,6 +135,7 @@ const el = {
   logoutButton: document.getElementById("logoutButton"),
   syncNow: document.getElementById("syncNow"),
   themeMode: document.getElementById("themeMode"),
+  themeChoices: document.getElementById("themeChoices"),
   toast: document.getElementById("toast"),
   mainSummary: document.getElementById("mainSummary"),
   activeTasks: document.getElementById("activeTasks"),
@@ -219,10 +223,20 @@ const el = {
   resetRuntimeData: document.getElementById("resetRuntimeData"),
   adminUserList: document.getElementById("adminUserList"),
   adminUserCount: document.getElementById("adminUserCount"),
+  adminSearch: document.getElementById("adminSearch"),
+  adminRefresh: document.getElementById("adminRefresh"),
   adminRevealTitle: document.getElementById("adminRevealTitle"),
   adminRevealProfile: document.getElementById("adminRevealProfile"),
   adminRevealTasks: document.getElementById("adminRevealTasks"),
   adminRevealBack: document.getElementById("adminRevealBack"),
+  adminControlPanel: document.getElementById("adminControlPanel"),
+  adminManageProfileForm: document.getElementById("adminManageProfileForm"),
+  adminManageName: document.getElementById("adminManageName"),
+  adminManageEmail: document.getElementById("adminManageEmail"),
+  adminManagePasswordForm: document.getElementById("adminManagePasswordForm"),
+  adminManagePassword: document.getElementById("adminManagePassword"),
+  adminSignoutUser: document.getElementById("adminSignoutUser"),
+  adminDeleteUser: document.getElementById("adminDeleteUser"),
 };
 
 init();
@@ -259,10 +273,20 @@ function disableOfflineSystem() {
 }
 
 function applyTheme() {
-  const theme = state.settings.theme || "light";
+  const availableThemes = ["light", "calm", "ocean", "rose", "dark", "graphite", "night"];
+  const requestedTheme = state.settings.theme || "light";
+  const theme = availableThemes.includes(requestedTheme) ? requestedTheme : "light";
+  state.settings.theme = theme;
   document.documentElement.dataset.theme = theme;
-  document.documentElement.style.colorScheme = theme === "dark" || theme === "night" ? "dark" : "light";
+  document.documentElement.style.colorScheme = ["dark", "graphite", "night"].includes(theme)
+    ? "dark"
+    : "light";
   if (el.themeMode) el.themeMode.value = theme;
+  el.themeChoices?.querySelectorAll("[data-theme-value]").forEach((button) => {
+    const active = button.dataset.themeValue === theme;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
 }
 
 function bindEvents() {
@@ -294,6 +318,9 @@ function bindEvents() {
     state.sync = { ...state.sync, mode: "local", lastError: "" };
     isAdmin = false;
     adminUsers = [];
+    adminUsersLoaded = false;
+    adminUsersLoading = false;
+    adminSearchTerm = "";
     adminRevealTarget = "";
     adminRevealData = null;
     updateAdminNav();
@@ -311,6 +338,13 @@ function bindEvents() {
 
   on(el.themeMode, "change", () => {
     state.settings.theme = el.themeMode.value;
+    applyTheme();
+    saveState();
+  });
+  on(el.themeChoices, "click", (event) => {
+    const button = event.target.closest("[data-theme-value]");
+    if (!button) return;
+    state.settings.theme = button.dataset.themeValue;
     applyTheme();
     saveState();
   });
@@ -356,6 +390,23 @@ function bindEvents() {
   on(el.dataDownload, "click", downloadDataExport);
   on(el.resetRuntimeData, "click", resetRuntimeData);
   on(el.adminRevealBack, "click", () => switchView("admin"));
+  on(el.adminSearch, "input", () => {
+    adminSearchTerm = normalizeSearchText(el.adminSearch.value);
+    renderAdminList();
+  });
+  on(el.adminRefresh, "click", async () => {
+    await refreshAdminUsers();
+  });
+  on(el.adminManageProfileForm, "submit", async (event) => {
+    event.preventDefault();
+    await updateManagedUserProfile();
+  });
+  on(el.adminManagePasswordForm, "submit", async (event) => {
+    event.preventDefault();
+    await resetManagedUserPassword();
+  });
+  on(el.adminSignoutUser, "click", signoutManagedUser);
+  on(el.adminDeleteUser, "click", deleteManagedUser);
   window.addEventListener("online", () => {
     if (pendingCloudSync) scheduleCloudSave(250);
   });
@@ -533,7 +584,7 @@ function fillDefaultFormValues() {
 
 function switchView(view) {
   if ((view === "admin" || view === "adminReveal") && !isAdmin) {
-    toast("هذه الصفحة للادمن فقط");
+    toast("هذه الصفحة للمدير فقط");
     return;
   }
   currentView = viewRedirects[view] || view;
@@ -717,6 +768,8 @@ async function checkAdminAccess() {
   if (!canCloudSync()) {
     isAdmin = false;
     adminUsers = [];
+    adminUsersLoaded = false;
+    adminUsersLoading = false;
     updateAdminNav();
     return;
   }
@@ -726,6 +779,11 @@ async function checkAdminAccess() {
     isAdmin = Boolean(response.isAdmin);
   } catch {
     isAdmin = false;
+  }
+  if (!isAdmin) {
+    adminUsers = [];
+    adminUsersLoaded = false;
+    adminUsersLoading = false;
   }
   updateAdminNav();
 }
@@ -768,9 +826,51 @@ async function adminRequest(payload) {
 
 async function loadAdminUsers(force = false) {
   if (!isAdmin) return;
-  if (!force && adminUsers.length) return;
-  const response = await adminRequest({ action: "list" });
-  adminUsers = Array.isArray(response.users) ? response.users : [];
+  if (adminUsersLoading) return;
+  if (!force && adminUsersLoaded) return;
+
+  adminUsersLoading = true;
+  try {
+    const response = await adminRequest({ action: "list" });
+    adminUsers = Array.isArray(response.users)
+      ? response.users.map(normalizeAdminUser).filter((user) => user.username)
+      : [];
+    adminUsersLoaded = true;
+  } finally {
+    adminUsersLoading = false;
+  }
+}
+
+function normalizeAdminUser(value) {
+  const user = typeof value === "string" ? { username: value } : value || {};
+  return {
+    username: normalizeUsername(user.username),
+    name: String(user.name || ""),
+    email: String(user.email || ""),
+    isAdmin: Boolean(user.isAdmin),
+    taskSettingsCount: Number(user.taskSettingsCount || 0),
+    completedCount: Number(user.completedCount || 0),
+    createdAt: user.createdAt || null,
+    updatedAt: user.updatedAt || null,
+  };
+}
+
+function normalizeSearchText(value) {
+  return String(value || "").trim().toLocaleLowerCase("ar-SA");
+}
+
+async function refreshAdminUsers() {
+  if (!isAdmin || adminUsersLoading) return;
+  if (el.adminRefresh) el.adminRefresh.disabled = true;
+  try {
+    await loadAdminUsers(true);
+    renderAdminList();
+    toast("تم تحديث الحسابات");
+  } catch (error) {
+    toast(error.message || "تعذر تحديث الحسابات");
+  } finally {
+    if (el.adminRefresh) el.adminRefresh.disabled = false;
+  }
 }
 
 async function openAdminReveal(username) {
@@ -785,10 +885,113 @@ async function openAdminReveal(username) {
     });
   } catch (error) {
     adminRevealData = null;
-    toast(error.message || "تعذر جلب بيانات الكشف");
+    toast(error.message || "تعذر جلب بيانات الحساب");
   } finally {
     adminRevealLoading = false;
     render();
+  }
+}
+
+function setAdminControlsDisabled(disabled) {
+  [
+    el.adminManageName,
+    el.adminManageEmail,
+    el.adminManagePassword,
+    el.adminSignoutUser,
+    el.adminDeleteUser,
+  ].forEach((control) => {
+    if (control) control.disabled = disabled;
+  });
+  el.adminManageProfileForm
+    ?.querySelectorAll("button")
+    .forEach((button) => {
+      button.disabled = disabled;
+    });
+  el.adminManagePasswordForm
+    ?.querySelectorAll("button")
+    .forEach((button) => {
+      button.disabled = disabled;
+    });
+}
+
+async function updateManagedUserProfile() {
+  if (!adminRevealTarget || !adminRevealData) return;
+  setAdminControlsDisabled(true);
+  try {
+    const response = await adminRequest({
+      action: "update-user",
+      targetUsername: adminRevealTarget,
+      name: el.adminManageName?.value,
+      email: el.adminManageEmail?.value,
+    });
+    const user = normalizeAdminUser(response.user);
+    adminUsers = adminUsers.map((item) =>
+      item.username === adminRevealTarget ? { ...item, ...user } : item,
+    );
+    adminRevealData.user = { ...adminRevealData.user, ...user };
+    renderAdminReveal();
+    toast("تم حفظ بيانات الحساب");
+  } catch (error) {
+    toast(error.message || "تعذر حفظ بيانات الحساب");
+  } finally {
+    setAdminControlsDisabled(false);
+  }
+}
+
+async function resetManagedUserPassword() {
+  if (!adminRevealTarget || !adminRevealData) return;
+  const newPassword = String(el.adminManagePassword?.value || "");
+  setAdminControlsDisabled(true);
+  try {
+    await adminRequest({
+      action: "reset-password",
+      targetUsername: adminRevealTarget,
+      newPassword,
+    });
+    if (el.adminManagePasswordForm) el.adminManagePasswordForm.reset();
+    toast("تم تغيير كلمة المرور وإنهاء الجلسات القديمة");
+  } catch (error) {
+    toast(error.message || "تعذر تغيير كلمة المرور");
+  } finally {
+    setAdminControlsDisabled(false);
+  }
+}
+
+async function signoutManagedUser() {
+  if (!adminRevealTarget || !adminRevealData) return;
+  if (!confirm(`تسجيل خروج ${adminRevealTarget} من جميع أجهزته؟`)) return;
+  setAdminControlsDisabled(true);
+  try {
+    await adminRequest({
+      action: "signout-user",
+      targetUsername: adminRevealTarget,
+    });
+    toast("تم إنهاء جلسات الحساب");
+  } catch (error) {
+    toast(error.message || "تعذر إنهاء جلسات الحساب");
+  } finally {
+    setAdminControlsDisabled(false);
+  }
+}
+
+async function deleteManagedUser() {
+  if (!adminRevealTarget || !adminRevealData) return;
+  if (!confirm(`حذف حساب ${adminRevealTarget} وكل بياناته نهائيًا؟`)) return;
+  setAdminControlsDisabled(true);
+  try {
+    await adminRequest({
+      action: "delete-user",
+      targetUsername: adminRevealTarget,
+    });
+    adminUsers = adminUsers.filter((user) => user.username !== adminRevealTarget);
+    adminRevealTarget = "";
+    adminRevealData = null;
+    switchView("admin");
+    toast("تم حذف الحساب");
+  } catch (error) {
+    toast(error.message || "تعذر حذف الحساب");
+  } finally {
+    setAdminControlsDisabled(false);
   }
 }
 
@@ -1929,43 +2132,67 @@ function accountRow(label, value) {
   return `<div class="account-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
 }
 
-async function renderAdmin() {
+function renderAdmin() {
   if (!isAdmin) {
-    if (el.adminUserList) el.adminUserList.innerHTML = emptyState("هذه الصفحة للادمن فقط");
+    if (el.adminUserList) el.adminUserList.innerHTML = emptyState("هذه الصفحة للمدير فقط");
     if (el.adminUserCount) el.adminUserCount.textContent = "";
     return;
   }
 
-  if (el.adminUserList) {
-    el.adminUserList.innerHTML = emptyState("جاري تحميل الأسماء...");
-  }
-
-  try {
-    await loadAdminUsers(true);
-  } catch (error) {
-    if (el.adminUserList) {
-      el.adminUserList.innerHTML = emptyState(error.message || "تعذر تحميل قائمة المستخدمين");
+  if (!adminUsersLoaded) {
+    if (el.adminUserList) el.adminUserList.innerHTML = emptyState("جاري تحميل الحسابات...");
+    if (!adminUsersLoading) {
+      loadAdminUsers()
+        .then(renderAdminList)
+        .catch((error) => {
+          if (el.adminUserList) {
+            el.adminUserList.innerHTML = emptyState(error.message || "تعذر تحميل الحسابات");
+          }
+          if (el.adminUserCount) el.adminUserCount.textContent = "";
+        });
     }
-    if (el.adminUserCount) el.adminUserCount.textContent = "";
     return;
   }
+
+  renderAdminList();
+}
+
+function renderAdminList() {
+  if (!el.adminUserList) return;
+  const filteredUsers = adminSearchTerm
+    ? adminUsers.filter((user) =>
+        [user.username, user.name, user.email]
+          .map(normalizeSearchText)
+          .some((value) => value.includes(adminSearchTerm)),
+      )
+    : adminUsers;
 
   if (el.adminUserCount) {
-    el.adminUserCount.textContent = `${adminUsers.length} مستخدم`;
+    el.adminUserCount.textContent = adminSearchTerm
+      ? `${filteredUsers.length} من ${adminUsers.length}`
+      : `${adminUsers.length} حساب`;
   }
 
-  if (!el.adminUserList) return;
-  if (!adminUsers.length) {
-    el.adminUserList.innerHTML = emptyState("لا يوجد مستخدمون بعد");
+  if (!filteredUsers.length) {
+    el.adminUserList.innerHTML = emptyState(
+      adminSearchTerm ? "لا توجد نتائج مطابقة" : "لا توجد حسابات مسجلة بعد",
+    );
     return;
   }
 
-  el.adminUserList.innerHTML = adminUsers
+  el.adminUserList.innerHTML = filteredUsers
     .map(
-      (username) => `
+      (user) => `
         <div class="admin-user-row">
-          <strong>${escapeHtml(username)}</strong>
-          <button class="ghost-button admin-reveal-button" data-action="admin-reveal" data-username="${escapeHtml(username)}" type="button">كشف</button>
+          <div class="admin-user-identity">
+            <span class="admin-user-avatar" aria-hidden="true">${escapeHtml((user.name || user.username).slice(0, 1).toUpperCase())}</span>
+            <div>
+              <strong>${escapeHtml(user.name || user.username)}</strong>
+              <span>@${escapeHtml(user.username)}${user.isAdmin ? ' <b class="pill">مدير</b>' : ""}</span>
+              <small>${escapeHtml(user.email || "بلا بريد")} • ${user.taskSettingsCount} إعداد مهمة</small>
+            </div>
+          </div>
+          <button class="ghost-button admin-reveal-button" data-action="admin-reveal" data-username="${escapeHtml(user.username)}" type="button">إدارة</button>
         </div>
       `,
     )
@@ -1974,42 +2201,62 @@ async function renderAdmin() {
 
 function renderAdminReveal() {
   if (!isAdmin) {
-    if (el.adminRevealProfile) el.adminRevealProfile.innerHTML = emptyState("هذه الصفحة للادمن فقط");
+    if (el.adminRevealProfile) el.adminRevealProfile.innerHTML = emptyState("هذه الصفحة للمدير فقط");
     if (el.adminRevealTasks) el.adminRevealTasks.innerHTML = "";
+    if (el.adminControlPanel) el.adminControlPanel.hidden = true;
     return;
   }
 
   if (el.adminRevealTitle) {
-    el.adminRevealTitle.textContent = adminRevealTarget ? `كشف: ${adminRevealTarget}` : "كشف";
+    el.adminRevealTitle.textContent = adminRevealTarget
+      ? `إدارة: ${adminRevealTarget}`
+      : "إدارة الحساب";
   }
 
   if (adminRevealLoading) {
-    if (el.adminRevealProfile) el.adminRevealProfile.innerHTML = emptyState("جاري جلب بيانات الكشف...");
+    if (el.adminRevealProfile) el.adminRevealProfile.innerHTML = emptyState("جاري جلب بيانات الحساب...");
     if (el.adminRevealTasks) el.adminRevealTasks.innerHTML = "";
+    if (el.adminControlPanel) el.adminControlPanel.hidden = true;
     return;
   }
 
   if (!adminRevealData) {
     if (el.adminRevealProfile) el.adminRevealProfile.innerHTML = emptyState("لا توجد بيانات للعرض");
     if (el.adminRevealTasks) el.adminRevealTasks.innerHTML = "";
+    if (el.adminControlPanel) el.adminControlPanel.hidden = true;
     return;
   }
 
   const user = adminRevealData.user || {};
   const month = adminRevealData.month || {};
   const tasks = Array.isArray(adminRevealData.tasks) ? adminRevealData.tasks : [];
+  const selfAccount = normalizeUsername(state.user?.username) === adminRevealTarget;
+  const protectedAdmin = Boolean(user.isAdmin) || adminUsers.some(
+    (item) => item.username === adminRevealTarget && item.isAdmin,
+  );
 
   if (el.adminRevealProfile) {
     el.adminRevealProfile.innerHTML = `
-      <div class="admin-profile-grid">
-        ${accountRow("اسم المستخدم", user.username || adminRevealTarget)}
-        ${accountRow("الاسم", user.name || "غير محدد")}
-        ${accountRow("البريد", user.email || "غير محدد")}
-        ${accountRow("آخر دخول", user.lastLogin ? formatDateTime(user.lastLogin) : "غير محدد")}
-        ${accountRow("سجل الشهر", month.label || "الشهر الحالي")}
-      </div>
+      ${accountRow("اسم المستخدم", user.username || adminRevealTarget)}
+      ${accountRow("الاسم", user.name || "غير محدد")}
+      ${accountRow("البريد", user.email || "غير محدد")}
+      ${accountRow("آخر دخول", user.lastLogin ? formatDateTime(user.lastLogin) : "غير محدد")}
+      ${accountRow("تاريخ التسجيل", user.createdAt ? formatDateTime(user.createdAt) : "غير محدد")}
+      ${accountRow("آخر تحديث", user.updatedAt ? formatDateTime(user.updatedAt) : "غير محدد")}
+      ${accountRow("سجل الشهر", month.label || "الشهر الحالي")}
     `;
   }
+
+  if (el.adminControlPanel) el.adminControlPanel.hidden = false;
+  if (el.adminManageName && document.activeElement !== el.adminManageName) {
+    el.adminManageName.value = user.name || "";
+  }
+  if (el.adminManageEmail && document.activeElement !== el.adminManageEmail) {
+    el.adminManageEmail.value = user.email || "";
+  }
+  if (el.adminManagePasswordForm) el.adminManagePasswordForm.hidden = selfAccount;
+  if (el.adminSignoutUser) el.adminSignoutUser.hidden = selfAccount;
+  if (el.adminDeleteUser) el.adminDeleteUser.hidden = selfAccount || protectedAdmin;
 
   if (!el.adminRevealTasks) return;
   if (!tasks.length) {

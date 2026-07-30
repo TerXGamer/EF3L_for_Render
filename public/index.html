@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#17211d" />
+    <meta name="description" content="لوحة التحكم الآمنة لموقع افعل" />
+    <title>تحكم افعل</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <section class="login-screen" id="loginScreen">
+      <form class="login-panel" id="loginForm">
+        <div class="brand login-brand">
+          <img src="/icon.svg" width="52" height="52" alt="" />
+          <div>
+            <h1>تحكم افعل</h1>
+            <p>دخول المدير المحمي</p>
+          </div>
+        </div>
+        <label class="field">
+          <span>اسم المدير</span>
+          <input id="loginUsername" autocomplete="username" required />
+        </label>
+        <label class="field">
+          <span>كلمة المرور</span>
+          <input id="loginPassword" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="primary full" type="submit">
+          <i data-lucide="shield"></i>
+          <span>دخول آمن</span>
+        </button>
+        <p class="login-status" id="loginStatus" role="status"></p>
+      </form>
+    </section>
+
+    <div class="app-shell" id="appShell" hidden>
+      <aside class="sidebar" id="sidebar">
+        <div class="brand sidebar-brand">
+          <img src="/icon.svg" width="42" height="42" alt="" />
+          <div>
+            <strong>تحكم افعل</strong>
+            <span>مركز البيانات</span>
+          </div>
+        </div>
+        <nav class="nav-list" aria-label="أقسام لوحة الإدارة">
+          <button class="nav-button active" data-view="overview" type="button">
+            <i data-lucide="layout-dashboard"></i><span>نظرة عامة</span>
+          </button>
+          <button class="nav-button" data-view="accounts" type="button">
+            <i data-lucide="users"></i><span>الحسابات</span>
+          </button>
+          <button class="nav-button" data-view="database" type="button">
+            <i data-lucide="database"></i><span>قاعدة البيانات</span>
+          </button>
+          <button class="nav-button" data-view="audit" type="button">
+            <i data-lucide="activity"></i><span>سجل الإدارة</span>
+          </button>
+        </nav>
+        <div class="sidebar-footer">
+          <div>
+            <span>المدير</span>
+            <strong id="adminName">Tariq</strong>
+          </div>
+          <button class="icon-button light" id="logoutButton" type="button" title="تسجيل الخروج" aria-label="تسجيل الخروج">
+            <i data-lucide="log-out"></i>
+          </button>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <button class="icon-button mobile-menu" id="menuButton" type="button" aria-label="فتح القائمة">
+            <i data-lucide="menu"></i>
+          </button>
+          <div>
+            <p id="pageEyebrow">لوحة الإدارة</p>
+            <h1 id="pageTitle">نظرة عامة</h1>
+          </div>
+          <div class="top-actions">
+            <span class="connection-state" id="connectionState">متصل</span>
+            <button class="icon-button" id="refreshButton" type="button" title="تحديث البيانات" aria-label="تحديث البيانات">
+              <i data-lucide="refresh"></i>
+            </button>
+          </div>
+        </header>
+
+        <section class="view active" id="view-overview">
+          <div class="metric-grid" id="overviewMetrics"></div>
+          <section class="storage-band">
+            <div class="section-heading">
+              <div>
+                <p>سعة PostgreSQL التقديرية</p>
+                <h2>استخدام التخزين</h2>
+              </div>
+              <strong id="storagePercent"></strong>
+            </div>
+            <div class="storage-track" aria-label="نسبة استخدام قاعدة البيانات">
+              <span id="storageBar"></span>
+            </div>
+            <div class="storage-labels" id="storageLabels"></div>
+          </section>
+          <div class="two-column">
+            <section class="data-section">
+              <div class="section-heading">
+                <h2>أحدث الحسابات</h2>
+                <button class="text-button" data-view-link="accounts" type="button">عرض الكل</button>
+              </div>
+              <div class="compact-list" id="recentAccounts"></div>
+            </section>
+            <section class="data-section">
+              <div class="section-heading">
+                <h2>آخر الإجراءات</h2>
+                <button class="text-button" data-view-link="audit" type="button">عرض السجل</button>
+              </div>
+              <div class="compact-list" id="recentAudit"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-accounts">
+          <div class="toolbar">
+            <label class="search-field">
+              <i data-lucide="search"></i>
+              <input id="accountSearch" type="search" placeholder="ابحث بالاسم أو المستخدم أو البريد" />
+            </label>
+            <span id="accountsCount"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>الحساب</th>
+                  <th>المهام</th>
+                  <th>السجلات</th>
+                  <th>الجلسات</th>
+                  <th>الحجم</th>
+                  <th>آخر تحديث</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="accountsTable"></tbody>
+            </table>
+          </div>
+          <div class="pagination">
+            <button class="ghost" id="accountsPrev" type="button">السابق</button>
+            <span id="accountsPage"></span>
+            <button class="ghost" id="accountsNext" type="button">التالي</button>
+          </div>
+        </section>
+
+        <section class="view" id="view-account-detail">
+          <button class="back-button" id="accountBack" type="button">
+            <i data-lucide="arrow-right"></i><span>الحسابات</span>
+          </button>
+          <div class="account-title">
+            <div class="account-avatar"><i data-lucide="user"></i></div>
+            <div>
+              <p id="accountUsername"></p>
+              <h2 id="accountDisplayName"></h2>
+              <span id="accountEmail"></span>
+            </div>
+            <span class="protected-badge" id="protectedBadge" hidden>حساب محمي</span>
+          </div>
+          <div class="detail-tabs" role="tablist">
+            <button class="active" data-detail-tab="summary" type="button">الملخص والتحكم</button>
+            <button data-detail-tab="tasks" type="button">المهام المحفوظة</button>
+            <button data-detail-tab="records" type="button">سجل التنفيذ</button>
+            <button data-detail-tab="raw" type="button">البيانات النصية</button>
+          </div>
+          <div id="accountDetailContent"></div>
+        </section>
+
+        <section class="view" id="view-database">
+          <div class="database-header">
+            <div>
+              <p>PostgreSQL على Render</p>
+              <h2 id="databaseDisplayName"></h2>
+            </div>
+            <a class="ghost link-button" id="sourceAppLink" href="https://ef3l.onrender.com" target="_blank" rel="noreferrer">
+              فتح موقع افعل
+            </a>
+          </div>
+          <div class="fact-grid" id="databaseFacts"></div>
+          <section class="data-section">
+            <div class="section-heading"><h2>أحجام الجداول</h2><span>تشمل الفهارس والبيانات</span></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>الجدول</th><th>الحجم</th><th>الصفوف التقديرية</th></tr></thead>
+                <tbody id="tablesTable"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-audit">
+          <div class="section-heading">
+            <div><p>أثر كل إجراء إداري</p><h2>سجل الإدارة</h2></div>
+            <span id="auditCount"></span>
+          </div>
+          <div class="audit-list" id="auditList"></div>
+          <div class="pagination">
+            <button class="ghost" id="auditPrev" type="button">السابق</button>
+            <span id="auditPage"></span>
+            <button class="ghost" id="auditNext" type="button">التالي</button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="passwordDialog">
+      <form method="dialog" id="passwordForm">
+        <div class="dialog-heading">
+          <div><p>إجراء أمني</p><h2>إعادة تعيين كلمة المرور</h2></div>
+          <button class="icon-button" value="cancel" type="submit" formnovalidate aria-label="إغلاق"><i data-lucide="x"></i></button>
+        </div>
+        <label class="field">
+          <span>كلمة المرور الجديدة</span>
+          <input id="newAccountPassword" type="password" minlength="8" maxlength="128" required />
+        </label>
+        <p>سيتم تسجيل خروج الحساب من جميع أجهزته بعد التغيير.</p>
+        <div class="dialog-actions">
+          <button class="ghost" value="cancel" type="submit" formnovalidate>إلغاء</button>
+          <button class="primary" id="confirmPasswordReset" value="default" type="submit">حفظ وتأمين الحساب</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/lucide.js"></script>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

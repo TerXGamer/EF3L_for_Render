@@ -29,6 +29,13 @@
             <i data-lucide="list-checks" aria-hidden="true"></i>
             <span>السجلات</span>
           </button>
+          <button class="nav-create focus-nav-only" data-action="new-task" type="button" aria-label="مهمة جديدة" title="مهمة جديدة">
+            <i data-lucide="plus" aria-hidden="true"></i>
+          </button>
+          <button class="nav-button focus-nav-only focus-direct-nav" data-view="stats" type="button">
+            <i data-lucide="chart-no-axes-column-increasing" aria-hidden="true"></i>
+            <span>التقدم</span>
+          </button>
           <button class="nav-button" data-view="settingsHub" type="button">
             <i data-lucide="settings-2" aria-hidden="true"></i>
             <span>الإعدادات</span>
@@ -105,67 +112,87 @@
           <div class="settings-layout">
             <form class="form-panel" id="taskForm">
               <input type="hidden" id="taskId" />
-              <div class="form-row">
-                <label for="taskTitle">اسم المهمة</label>
-                <input id="taskTitle" required maxlength="80" autocomplete="off" />
+              <div class="task-sheet-head focus-only">
+                <div>
+                  <span>المهام</span>
+                  <h3 id="taskSheetTitle">مهمة جديدة</h3>
+                </div>
+                <button class="icon-button" id="closeTaskSheet" type="button" aria-label="إغلاق" title="إغلاق">
+                  <i data-lucide="x" aria-hidden="true"></i>
+                </button>
               </div>
-              <div class="form-row">
-                <label for="taskDescription">وصف المهمة</label>
-                <textarea id="taskDescription" rows="3" maxlength="260"></textarea>
-              </div>
-              <div class="form-grid">
+              <section class="focus-form-section">
+                <div class="focus-form-section-head focus-only"><span>01</span><strong>التفاصيل</strong></div>
                 <div class="form-row">
-                  <label for="taskStartDate">تبدأ من يوم</label>
-                  <input id="taskStartDate" type="date" required />
+                  <label for="taskTitle">اسم المهمة</label>
+                  <input id="taskTitle" required maxlength="80" autocomplete="off" />
                 </div>
                 <div class="form-row">
-                  <label for="taskRecurrence">التكرار</label>
-                  <select id="taskRecurrence">
-                    <option value="daily">كل يوم</option>
-                    <option value="weekly">كل أسبوع</option>
-                    <option value="monthly">كل شهر</option>
-                    <option value="custom">كل عدد أيام</option>
-                    <option value="once">مرة واحدة</option>
-                  </select>
+                  <label for="taskDescription">وصف المهمة</label>
+                  <textarea id="taskDescription" rows="3" maxlength="260"></textarea>
                 </div>
-                <div class="form-row">
-                  <label for="taskInterval">كل كم يوم</label>
-                  <input id="taskInterval" type="number" min="1" max="365" value="3" />
-                  <small class="hint" id="intervalHint">يُستخدم عند اختيار تكرار: كل عدد أيام.</small>
+              </section>
+              <section class="focus-form-section">
+                <div class="focus-form-section-head focus-only"><span>02</span><strong>الجدول</strong></div>
+                <div class="form-grid">
+                  <div class="form-row">
+                    <label for="taskStartDate">تبدأ من يوم</label>
+                    <input id="taskStartDate" type="date" required />
+                  </div>
+                  <div class="form-row">
+                    <label for="taskRecurrence">التكرار</label>
+                    <select id="taskRecurrence">
+                      <option value="daily">كل يوم</option>
+                      <option value="weekly">كل أسبوع</option>
+                      <option value="monthly">كل شهر</option>
+                      <option value="custom">كل عدد أيام</option>
+                      <option value="once">مرة واحدة</option>
+                    </select>
+                  </div>
+                  <div class="form-row">
+                    <label for="taskInterval">كل كم يوم</label>
+                    <input id="taskInterval" type="number" min="1" max="365" value="3" />
+                    <small class="hint" id="intervalHint">يُستخدم عند اختيار تكرار: كل عدد أيام.</small>
+                  </div>
+                  <div class="form-row">
+                    <label for="taskDependency">مرتبطة بمهمة</label>
+                    <select id="taskDependency"></select>
+                    <small class="hint" id="dependencyHint">تظهر هنا فقط مهام القائمة الرئيسية المتاحة الآن.</small>
+                  </div>
+                  <div class="form-row">
+                    <label for="taskTime">وقت الظهور</label>
+                    <input id="taskTime" type="time" required />
+                  </div>
+                  <div class="form-row">
+                    <label for="taskEndTime">وقت الانتهاء</label>
+                    <input id="taskEndTime" type="time" required />
+                  </div>
                 </div>
-                <div class="form-row">
-                  <label for="taskDependency">مرتبطة بمهمة</label>
-                  <select id="taskDependency"></select>
-                  <small class="hint" id="dependencyHint">تظهر هنا فقط مهام القائمة الرئيسية المتاحة الآن.</small>
+              </section>
+              <section class="focus-form-section focus-form-behavior">
+                <div class="focus-form-section-head focus-only"><span>03</span><strong>الأولوية والسلوك</strong></div>
+                <fieldset class="importance-field">
+                  <legend>مدى الأهمية</legend>
+                  <div class="segmented" id="importanceButtons">
+                    <button type="button" data-importance="2">2 منخفض</button>
+                    <button type="button" data-importance="4">4 متوسط</button>
+                    <button type="button" data-importance="6">6 عالي</button>
+                    <button type="button" data-importance="8">8 عالي جدًا</button>
+                    <button type="button" data-importance="10">10 قمة</button>
+                  </div>
+                </fieldset>
+                <div class="task-toggle-grid">
+                  <label class="check-row">
+                    <input id="taskRequiredOverdue" type="checkbox" />
+                    <span>انتقال للمهام المنتهية الواجبة إذا لم تتم</span>
+                  </label>
+                  <label class="check-row">
+                    <input id="taskActive" type="checkbox" checked />
+                    <span>المهمة مفعلة</span>
+                  </label>
                 </div>
-                <div class="form-row">
-                  <label for="taskTime">وقت الظهور</label>
-                  <input id="taskTime" type="time" required />
-                </div>
-                <div class="form-row">
-                  <label for="taskEndTime">وقت الانتهاء</label>
-                  <input id="taskEndTime" type="time" required />
-                </div>
-              </div>
-              <fieldset class="importance-field">
-                <legend>مدى الأهمية</legend>
-                <div class="segmented" id="importanceButtons">
-                  <button type="button" data-importance="2">2 منخفض</button>
-                  <button type="button" data-importance="4">4 متوسط</button>
-                  <button type="button" data-importance="6">6 عالي</button>
-                  <button type="button" data-importance="8">8 عالي جدًا</button>
-                  <button type="button" data-importance="10">10 قمة</button>
-                </div>
-              </fieldset>
-              <label class="check-row">
-                <input id="taskRequiredOverdue" type="checkbox" />
-                <span>انتقال للمهام المنتهية الواجبة إذا لم تتم</span>
-              </label>
-              <label class="check-row">
-                <input id="taskActive" type="checkbox" checked />
-                <span>المهمة مفعلة</span>
-              </label>
-              <div class="button-row">
+              </section>
+              <div class="button-row task-form-actions">
                 <button class="primary-button" type="submit">حفظ المهمة</button>
                 <button class="ghost-button" id="resetTaskForm" type="button">تفريغ النموذج</button>
               </div>
@@ -696,6 +723,8 @@
         </section>
       </main>
     </div>
+
+    <button class="task-sheet-backdrop focus-only" id="taskSheetBackdrop" type="button" aria-label="إغلاق إضافة المهمة"></button>
 
     <div id="loginDialog" class="login-dialog" data-mode="login" hidden>
       <form id="loginForm">

@@ -41,6 +41,7 @@ const THEME_LABELS = {
   graphite: "فحمي",
   night: "ليلي",
 };
+const INTERFACE_STYLES = new Set(["focus", "classic"]);
 const CUSTOM_THEME_PROPERTIES = [
   "--bg", "--surface", "--surface-soft", "--field", "--line", "--line-strong",
   "--text", "--muted", "--teal", "--teal-dark", "--coral", "--amber", "--green",
@@ -165,6 +166,7 @@ const el = {
   logoutButton: document.getElementById("logoutButton"),
   syncNow: document.getElementById("syncNow"),
   themeMode: document.getElementById("themeMode"),
+  layoutChoices: document.getElementById("layoutChoices"),
   themeChoices: document.getElementById("themeChoices"),
   themePresetButton: document.getElementById("themePresetButton"),
   themeCustomButton: document.getElementById("themeCustomButton"),
@@ -313,6 +315,16 @@ function disableOfflineSystem() {
 }
 
 function applyTheme() {
+  const interfaceStyle = INTERFACE_STYLES.has(state.settings.interfaceStyle)
+    ? state.settings.interfaceStyle
+    : "focus";
+  state.settings.interfaceStyle = interfaceStyle;
+  document.documentElement.dataset.layout = interfaceStyle;
+  el.layoutChoices?.querySelectorAll("[data-layout-value]").forEach((button) => {
+    const active = button.dataset.layoutValue === interfaceStyle;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
   const availableThemes = Object.keys(THEME_PRESETS);
   const requestedTheme = state.settings.theme || "light";
   const theme = availableThemes.includes(requestedTheme) ? requestedTheme : "light";
@@ -490,6 +502,16 @@ function bindEvents() {
     toast(state.sync.mode === "cloud" ? "تم التحديث والمزامنة" : "تم التحديث محليًا");
   });
 
+  on(el.layoutChoices, "click", (event) => {
+    const button = event.target.closest("[data-layout-value]");
+    if (!button || !INTERFACE_STYLES.has(button.dataset.layoutValue)) return;
+    state.settings.interfaceStyle = button.dataset.layoutValue;
+    applyTheme();
+    saveState();
+    render();
+    toast(button.dataset.layoutValue === "focus" ? "تم تطبيق التصميم الجديد" : "تم تطبيق التصميم الكلاسيكي");
+  });
+
   on(el.themeMode, "change", () => {
     state.settings.theme = el.themeMode.value;
     applyTheme();
@@ -607,6 +629,7 @@ function initialState() {
     tasks: [],
     instances: {},
     settings: {
+      interfaceStyle: "focus",
       theme: "light",
       themeCustomizations: {},
       displayWindow: {
@@ -663,6 +686,9 @@ function normalizeState(input) {
       ? next.settings.hiddenListInstanceIds
       : [],
   };
+  next.settings.interfaceStyle = INTERFACE_STYLES.has(next.settings.interfaceStyle)
+    ? next.settings.interfaceStyle
+    : "focus";
   next.imports = Array.isArray(next.imports) ? next.imports : [];
   next.meta = {
     ...base.meta,
@@ -1364,6 +1390,9 @@ function applyIncomingCloudState(data) {
   mergeIncomingState(incoming);
   if (THEME_PRESETS[incoming.settings?.theme]) {
     state.settings.theme = incoming.settings.theme;
+  }
+  if (INTERFACE_STYLES.has(incoming.settings?.interfaceStyle)) {
+    state.settings.interfaceStyle = incoming.settings.interfaceStyle;
   }
   state.settings.themeCustomizations = normalizeThemeCustomizations(
     incoming.settings?.themeCustomizations,

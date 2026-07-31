@@ -487,7 +487,7 @@ async function resetPassword(request, response, session, username) {
   );
   if (!result.rowCount) return sendJson(response, 404, { error: "الحساب غير موجود" });
   await getPool().query("DELETE FROM account_sessions WHERE username = $1", [username]);
-  await logAudit(session.sub, "reset_password", usernam…2 tokens truncated…ssionsRevoked: true });
+  await logAudit(session.sub, "reset_password", username, { sessionsRevoked: true });
   return sendJson(response, 200, { ok: true });
 }
 

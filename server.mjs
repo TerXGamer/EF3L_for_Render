@@ -8,9 +8,10 @@ import { promisify } from "node:util";
 import { Pool } from "pg";
 import {
   accountDataSection,
+  compactAccountData,
+  hydrateAccountData,
   normalizeUsername,
   pagination,
-  safeAccountData,
   summarizeData,
 } from "./core.mjs";
 
@@ -136,6 +137,9 @@ async function handleApi(request, response, url) {
   }
   if (parts[3] === "items" && parts[4] && request.method === "DELETE") {
     return deleteAccountItem(response, session, username, decodeURIComponent(parts[4]), url);
+  }
+  if (parts[3] === "items" && parts[4] && request.method === "PATCH") {
+    return updateAccountItem(request, response, session, username, decodeURIComponent(parts[4]), url);
   }
   if (parts.length === 3 && request.method === "DELETE") {
     return deleteAccount(response, session, username);
@@ -312,7 +316,8 @@ async function accountDetails(response, username) {
   ]);
   if (!accountResult.rowCount) return sendJson(response, 404, { error: "Ø§Ù„Ø­Ø³Ø§Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯" });
   const row = accountResult.rows[0];
-  const data = safeAccountData(row.data);
+  const data = hydrateAccountData(row.data);
+  const activity = buildActivitySummary(data);
   return sendJson(response, 200, {
     account: {
       ...publicAccountRow(row),
@@ -321,6 +326,13 @@ async function accountDetails(response, username) {
       protected: protectedUsernames.has(username),
     },
     counts: summarizeData(data),
+    activity,
+    storageBreakdown: {
+      tasks: jsonBytes(data.tasks || []),
+      records: jsonBytes(data.instances || {}),
+      settings: jsonBytes(data.settings || {}),
+      metadata: jsonBytes({ user: data.user || {}, meta: data.meta || {} }),
+    },
     sessions: sessionsResult.rows,
     sections: {
       version: data.version ?? null,
@@ -337,6 +349,9 @@ async function accountItems(response, username, url) {
   const { limit, offset } = pagination(url.searchParams.get("limit"), url.searchParams.get("offset"));
   const search = String(url.searchParams.get("search") || "").trim().toLocaleLowerCase();
   const status = String(url.searchParams.get("status") || "").trim();
+  const year = boundedInteger(url.searchParams.get("year"), 2000, 2200);
+  const month = boundedInteger(url.searchParams.get("month"), 1, 12);
+  const day = boundedInteger(url.searchParams.get("day"), 1, 31);
   const data = await accountData(username);
   if (!data) return sendJson(response, 404, { error: "Ø§Ù„Ø­Ø³Ø§Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯" });
   let items =
@@ -349,432 +364,9 @@ async function accountItems(response, username, url) {
   if (status && type === "records") {
     items = items.filter((item) => String(item.status || "") === status);
   }
-  items.sort((a, b) =>
-    String(b.updatedAt || b.createdAt || b.date || "").localeCompare(
-      String(a.updatedAt || a.createdAt || a.date || ""),
-    ),
-  );
-  return sendJson(response, 200, {
-    type,
-    items: items.slice(offset, offset + limit),
-    total: items.length,
-    limit,
-    offset,
-  });
-}
-
-async function accountRaw(response, username, url) {
-  const data = await accountData(username);
-  if (!data) return sendJson(response, 404, { error: "Ø§Ù„Ø­Ø³Ø§Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯" });
-  const section = String(url.searchParams.get("section") || "");
-  return sendJson(response, 200, {
-    section: section || "account",
-    value: section === "summary" ? summarizeData(data) : accountDataSection(data, section),
-  });
-}
-
-async function exportAccount(response, username) {
-  const result = await getPool().query(
-    `SELECT username, name, email, data, summary, created_at, updated_at
-       FROM accounts WHERE username = $1`,
-    [username],
-  );
-  if (!result.rowCount) return sendJson(response, 404, { error: "Ø§Ù„Ø­Ø³Ø§Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯" });
-  const payload = JSON.stringify(
-    { exportedAt: new Date().toISOString(), account: result.rows[0] },
-    null,
-    2,
-  );
-  response.writeHead(200, {
-    ...securityHeaders,
-    "Cache-Control": "no-store",
-    "Content-Type": "application/json; charset=utf-8",
-    "Content-Disposition": `attachment; filename="ef3l-${username}.json"`,
-    "Content-Length": Buffer.byteLength(payload),
-  });
-  response.end(payload);
-}
-
-async function updateProfile(request, response, session, username) {
-  const body = await readJson(request);
-  const name = String(body.name || "").trim().slice(0, 80);
-  const email = String(body.email || "").trim().toLocaleLowerCase().slice(0, 120);
-  if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return sendJson(response, 400, { error: "Ø§Ù„Ø§Ø³Ù… Ø£Ùˆ Ø§Ù„Ø¨Ø±ÙŠØ¯ ØºÙŠØ± ØµØ§Ù„Ø­" });
+  if (type === "records" && year) {
+    const prefix = `${year}-${month ? String(month).padStart(2, "0") : ""}`;
+    items = items.filter((item) => String(item.date || "").startsWith(prefix));
   }
-  const client = await getPool().connect();
-  try {
-    await client.query("BEGIN");
-    const selected = await client.query("SELECT data FROM accounts WHERE username = $1 FOR UPDATE", [username]);
-    if (!selected.rowCount) {
-      await client.query("ROLLBACK");
-      return sendJson(response, 404, { error: "Ø§Ù„Ø­Ø³Ø§Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯" });
-    }
-    const data = safeAccountData(selected.rows[0].data);
-    data.user = { ...(data.user || {}), username, name, email };
-    await client.query(
-      `UPDATE accounts SET name = $2, email = $3, data = $4::jsonb, updated_at = NOW()
-        WHERE username = $1`,
-      [username, name, email, JSON.stringify(data)],
-    );
-    await client.query("COMMIT");
-    await logAudit(session.sub, "update_profile", username, { name, email });
-    return sendJson(response, 200, { ok: true });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-async function resetPassword(request, response, session, username) {
-  const body = await readJson(request);
-  const password = String(body.password || "");
-  if (password.length < 8 || password.length > 128) {
-    return sendJson(response, 400, { error: "ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø¨ÙŠÙ† 8 Ùˆ128 Ø­Ø±ÙÙ‹Ø§" });
-  }
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = Buffer.from(
-    await scrypt(password, salt, 64, { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }),
-  ).toString("hex");
-  const result = await getPool().query(
-    `UPDATE accounts SET salt = $2, password_hash = $3, updated_at = NOW()
-      WHERE username = $1`,
-    [username, salt, hash],
-  );
-  if (!result.rowCount) return sendJson(response, 404, { error: "Ø§Ù„Ø­Ø³Ø§Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯" });
-  await getPool().query("DELETE FROM account_sessions WHERE username = $1", [username]);
-  await logAudit(session.sub, "reset_password", username, { sessionsRevoked: true });
-  return sendJson(response, 200, { ok: true });
-}
-
-async function revokeSessions(response, session, username) {
-  const result = await getPool().query("DELETE FROM account_sessions WHERE username = $1", [username]);
-  await logAudit(session.sub, "revoke_sessions", username, { count: result.rowCount });
-  return sendJson(response, 200, { ok: true, count: result.rowCount });
-}
-
-async function deleteAccountItem(response, session, username, itemId, url) {
-  const type = url.searchParams.get("type") === "records" ? "records" : "tasks";
-  const client = await getPool().connect();
-  try {
-    await client.query("BEGIN");
-    const result = await client.query("SELECT data FROM accounts WHERE username = $1 FOR UPDATE", [username]);
-    if (!result.rowCount) {
-      await client.query("ROLLBACK");
-      return sendJson(response, 404, { error: "Ø§Ù„Ø­Ø³Ø§Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯" });
-    }
-    const data = safeAccountData(result.rows[0].data);
-    const deletedAt = new Date().toISOString();
-    data.meta = data.meta && typeof data.meta === "object" ? data.meta : {};
-    if (type === "tasks") {
-      const before = Array.isArray(data.tasks) ? data.tasks.length : 0;
-      data.tasks = (Array.isArray(data.tasks) ? data.tasks : []).filter(
-        (task) => String(task?.id || "") !== itemId,
-      );
-      if (data.tasks.length === before) {
-        await client.query("ROLLBACK");
-        return sendJson(response, 404, { error: "Ø§Ù„Ù…Ù‡Ù…Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©" });
-      }
-      data.meta.taskTombstones = { ...(data.meta.taskTombstones || {}), [itemId]: deletedAt };
-      data.instances = Object.fromEntries(
-        Object.entries(data.instances || {}).filter(([, item]) => String(item?.taskId || "") !== itemId),
-      );
-    } else {
-      if (!data.instances?.[itemId]) {
-        await client.query("ROLLBACK");
-        return sendJson(response, 404, { error: "Ø§Ù„Ø³Ø¬Ù„ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯" });
-      }
-      delete data.instances[itemId];
-      data.meta.instanceTombstones = { ...(data.meta.instanceTombstones || {}), [itemId]: deletedAt };
-    }
-    const summary = summarizeData(data);
-    await client.query(
-      `UPDATE accounts SET data = $2::jsonb, summary = $3::jsonb, updated_at = NOW()
-        WHERE username = $1`,
-      [username, JSON.stringify(data), JSON.stringify(summary)],
-    );
-    await client.query("COMMIT");
-    await logAudit(session.sub, type === "tasks" ? "delete_task" : "delete_record", username, {
-      itemId,
-    });
-    return sendJson(response, 200, { ok: true });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-async function deleteAccount(response, session, username) {
-  if (protectedUsernames.has(username)) {
-    return sendJson(response, 403, { error: "Ù‡Ø°Ø§ Ø§Ù„Ø­Ø³Ø§Ø¨ Ù…Ø­Ù…ÙŠ ÙˆÙ„Ø§ ÙŠÙ…ÙƒÙ† Ø­Ø°ÙÙ‡" });
-  }
-  const result = await getPool().query("DELETE FROM accounts WHERE username = $1", [username]);
-  if (!result.rowCount) return sendJson(response, 404, { error: "Ø§Ù„Ø­Ø³Ø§Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯" });
-  await logAudit(session.sub, "delete_account", username, {});
-  return sendJson(response, 200, { ok: true });
-}
-
-async function listAudit(response, url) {
-  const { limit, offset } = pagination(url.searchParams.get("limit"), url.searchParams.get("offset"));
-  const [rows, count] = await Promise.all([
-    getPool().query(
-      `SELECT id, admin_username, action, target_username, details, created_at
-         FROM admin_audit_log ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
-      [limit, offset],
-    ),
-    getPool().query("SELECT count(*)::bigint AS total FROM admin_audit_log"),
-  ]);
-  return sendJson(response, 200, {
-    items: rows.rows,
-    total: Number(count.rows[0].total),
-    limit,
-    offset,
-  });
-}
-
-async function accountData(username) {
-  const result = await getPool().query("SELECT data FROM accounts WHERE username = $1", [username]);
-  return result.rowCount ? safeAccountData(result.rows[0].data) : null;
-}
-
-async function sessionCount() {
-  const result = await getPool().query("SELECT count(*)::bigint AS total FROM account_sessions");
-  return Number(result.rows[0].total);
-}
-
-function publicAccountRow(row) {
-  return {
-    username: row.username,
-    name: row.name,
-    email: row.email,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    dataBytes: Number(row.data_bytes || 0),
-  };
-}
-
-async function logAudit(adminUsername, action, targetUsername, details) {
-  await getPool().query(
-    `INSERT INTO admin_audit_log (admin_username, action, target_username, details)
-     VALUES ($1, $2, $3, $4::jsonb)`,
-    [adminUsername, action, targetUsername || "", JSON.stringify(details || {})],
-  );
-}
-
-function ensureAuditSchema() {
-  if (!schemaPromise) {
-    schemaPromise = getPool()
-      .query(
-        `CREATE TABLE IF NOT EXISTS admin_audit_log (
-           id BIGSERIAL PRIMARY KEY,
-           admin_username TEXT NOT NULL,
-           action TEXT NOT NULL,
-           target_username TEXT NOT NULL DEFAULT '',
-           details JSONB NOT NULL DEFAULT '{}'::jsonb,
-           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-         );
-         CREATE INDEX IF NOT EXISTS admin_audit_log_created_at_idx
-           ON admin_audit_log (created_at DESC);`,
-      )
-      .catch((error) => {
-        schemaPromise = null;
-        throw error;
-      });
-  }
-  return schemaPromise;
-}
-
-function getPool() {
-  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL ØºÙŠØ± Ù…Ø¶Ø¨ÙˆØ·");
-  if (!pool) {
-    const connectionString = process.env.DATABASE_URL;
-    const config = {
-      connectionString,
-      max: Math.min(10, Math.max(1, Number(process.env.PG_POOL_MAX || 4))),
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
-    };
-    if (/sslmode=require/i.test(connectionString) || /\.render\.com/i.test(connectionString)) {
-      config.ssl = { rejectUnauthorized: false };
-    }
-    pool = new Pool(config);
-    pool.on("error", (error) => console.error("Database pool error", error));
-  }
-  return pool;
-}
-
-function sessionResponse(session) {
-  return {
-    authenticated: true,
-    username: session.sub,
-    csrfToken: session.csrf,
-    expiresAt: new Date(session.exp * 1000).toISOString(),
-  };
-}
-
-function signSession(payload) {
-  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const signature = crypto
-    .createHmac("sha256", sessionSecret())
-    .update(encoded)
-    .digest("base64url");
-  return `${encoded}.${signature}`;
-}
-
-function readAdminSession(request) {
-  const token = parseCookies(request.headers.cookie || "")[cookieName];
-  if (!token) return null;
-  const [encoded, signature] = token.split(".");
-  if (!encoded || !signature) return null;
-  const expected = crypto.createHmac("sha256", sessionSecret()).update(encoded).digest("base64url");
-  if (!constantTimeEqual(signature, expected)) return null;
-  try {
-    const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
-    const expectedUser = String(process.env.ADMIN_USERNAME || "");
-    if (
-      payload.exp <= Math.floor(Date.now() / 1000) ||
-      !constantTimeEqual(String(payload.sub || "").toLowerCase(), expectedUser.toLowerCase())
-    ) {
-      return null;
-    }
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
-function sessionSecret() {
-  const secret = String(process.env.SESSION_SECRET || "");
-  if (secret.length < 32) throw new Error("SESSION_SECRET ÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† 32 Ø­Ø±ÙÙ‹Ø§ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„");
-  return secret;
-}
-
-function setSessionCookie(request, response, token) {
-  const secure = process.env.NODE_ENV === "production" || request.headers["x-forwarded-proto"] === "https";
-  response.setHeader(
-    "Set-Cookie",
-    `${cookieName}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessionHours * 3600}${secure ? "; Secure" : ""}`,
-  );
-}
-
-function clearSessionCookie(request, response) {
-  const secure = process.env.NODE_ENV === "production" || request.headers["x-forwarded-proto"] === "https";
-  response.setHeader(
-    "Set-Cookie",
-    `${cookieName}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure ? "; Secure" : ""}`,
-  );
-}
-
-function parseCookies(header) {
-  return Object.fromEntries(
-    header
-      .split(";")
-      .map((part) => part.trim().split("="))
-      .filter(([key, value]) => key && value)
-      .map(([key, ...value]) => [key, value.join("=")]),
-  );
-}
-
-function constantTimeEqual(first, second) {
-  const left = Buffer.from(String(first));
-  const right = Buffer.from(String(second));
-  if (left.length !== right.length) {
-    crypto.timingSafeEqual(left, Buffer.alloc(left.length));
-    return false;
-  }
-  return crypto.timingSafeEqual(left, right);
-}
-
-function isRateLimited(ip) {
-  const cutoff = Date.now() - 15 * 60_000;
-  const attempts = (loginAttempts.get(ip) || []).filter((time) => time > cutoff);
-  loginAttempts.set(ip, attempts);
-  return attempts.length >= 6;
-}
-
-function recordFailure(ip) {
-  loginAttempts.set(ip, [...(loginAttempts.get(ip) || []), Date.now()].slice(-6));
-}
-
-function clearFailures(ip) {
-  loginAttempts.delete(ip);
-}
-
-function clientIp(request) {
-  return String(request.headers["x-forwarded-for"] || request.socket.remoteAddress || "")
-    .split(",")[0]
-    .trim()
-    .slice(0, 80);
-}
-
-function isMutation(method) {
-  return ["POST", "PATCH", "PUT", "DELETE"].includes(method || "");
-}
-
-async function readJson(request) {
-  const chunks = [];
-  let size = 0;
-  for await (const chunk of request) {
-    size += chunk.length;
-    if (size > 256 * 1024) throw new Error("Ø§Ù„Ø·Ù„Ø¨ Ø£ÙƒØ¨Ø± Ù…Ù† Ø§Ù„Ø­Ø¯ Ø§Ù„Ù…Ø³Ù…ÙˆØ­");
-    chunks.push(chunk);
-  }
-  if (!chunks.length) return {};
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  } catch {
-    throw new Error("ØµÙŠØºØ© JSON ØºÙŠØ± ØµØ§Ù„Ø­Ø©");
-  }
-}
-
-async function serveStatic(request, response, pathname) {
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    return sendText(response, 405, "Method not allowed");
-  }
-  const requested = pathname === "/" ? "/index.html" : pathname;
-  if (!staticFiles.has(requested)) return sendText(response, 404, "Not found");
-  const filePath = path.join(rootDir, requested.slice(1));
-  const info = await stat(filePath).catch(() => null);
-  if (!info?.isFile()) return sendText(response, 404, "Not found");
-  response.writeHead(200, {
-    ...securityHeaders,
-    "Content-Type": contentType(path.extname(filePath)),
-    "Content-Length": info.size,
-    "Cache-Control": requested === "/index.html" ? "no-cache" : "public, max-age=3600",
-  });
-  if (request.method === "HEAD") return response.end();
-  createReadStream(filePath).pipe(response);
-}
-
-function contentType(extension) {
-  return {
-    ".html": "text/html; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".js": "text/javascript; charset=utf-8",
-    ".svg": "image/svg+xml",
-  }[extension] || "application/octet-stream";
-}
-
-function sendJson(response, status, value) {
-  const body = JSON.stringify(value);
-  response.writeHead(status, {
-    ...securityHeaders,
-    "Cache-Control": "no-store",
-    "Content-Type": "application/json; charset=utf-8",
-    "Content-Length": Buffer.byteLength(body),
-  });
-  response.end(body);
-}
-
-function sendText(response, status, value) {
-  response.writeHead(status, {
-    ...securityHeaders,
-    "Content-Type": "text/plain; charset=utf-8",
-  });
-  response.end(value);
-}
-
+  if (type === "records" && year && month && day) {
+    const selectedDate = `${year}-${String(month).padStart(2, "0")}-${String(day×Þ;¶‰žËkºwµç@ô¹•Ü…Ñ” ¤¹Ñ½%M=MÑÉ¥¹œ ¤ì(€€€‘…Ñ„¹µ•Ñ„€ô‘…Ñ„¹µ•Ñ„€˜˜ÑåÁ•½˜‘…Ñ„¹µ•Ñ„€ôôô€‰½‰©•Ðˆ€ü‘…Ñ„¹µ•Ñ„€èíôì(€€€¥˜€¡ÑåÁ”€ôôô€‰Ñ…Í­Ìˆ¤ì(€€€€€½¹ÍÐ‰•™½É”€ôÉÉ…ä¹¥ÍÉÉ…ä¡‘…Ñ„¹Ñ…Í­Ì¤€ü‘…Ñ„¹Ñ…Í­Ì¹±•¹Ñ €è€Àì(€€€€€‘…Ñ„¹Ñ…Í­Ì€ô€¡ÉÉ…ä¹¥ÍÉÉ…ä¡‘…Ñ„¹Ñ…Í­Ì¤€ü‘…Ñ„¹Ñ…Í­Ì€èmt¤¹™¥±Ñ•È (€€€€€€€€¡Ñ…Í¬¤€ôøMÑÉ¥¹œ¡Ñ…Í¬ü¹¥ñð€ˆˆ¤€„ôô¥Ñ•µ%°(€€€€€€¤ì(€€€€€¥˜€¡‘…Ñ„¹Ñ…Í­Ì¹±•¹Ñ €ôôô‰•™½É”¤ì(€€€€€€€…Ý…¥Ð±¥•¹Ð¹ÅÕ•Éä ‰I=11	,ˆ¤ì(€€€€€€€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°€ÐÀÐ°ì•ÉÉ½Èè€‹bŸffffb¤ƒbëf+bÄƒff#b³f#b¿b¤ˆô¤ì(€€€€€ô(€€€€€‘…Ñ„¹µ•Ñ„¹Ñ…Í­Q½µ‰ÍÑ½¹•Ì€ôì€¸¸¸¡‘…Ñ„¹µ•Ñ„¹Ñ…Í­Q½µ‰ÍÑ½¹•Ìñðíô¤°m¥Ñ•µ%‘tè‘•±•Ñ•‘Ðôì(€€€€€‘…Ñ„¹¥¹ÍÑ…¹•Ì€ô=‰©•Ð¹™É½µ¹ÑÉ¥•Ì (€€€€€€€=‰©•Ð¹•¹ÑÉ¥•Ì¡‘…Ñ„¹¥¹ÍÑ…¹•Ìñðíô¤¹™¥±Ñ•È ¡l°¥Ñ•µt¤€ôøMÑÉ¥¹œ¡¥Ñ•´ü¹Ñ…Í­%ñð€ˆˆ¤€„ôô¥Ñ•µ%¤°(€€€€€€¤ì(€€€ô•±Í”ì(€€€€€¥˜€ …‘…Ñ„¹¥¹ÍÑ…¹•Ìü¹m¥Ñ•µ%‘t¤ì(€€€€€€€…Ý…¥Ð±¥•¹Ð¹ÅÕ•Éä ‰I=11	,ˆ¤ì(€€€€€€€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°€ÐÀÐ°ì•ÉÉ½Èè€‹bŸfbÏb³fƒbëf+bÄƒff#b³f#b¼ˆô¤ì(€€€€€ô(€€€€€‘•±•Ñ”‘…Ñ„¹¥¹ÍÑ…¹•Ím¥Ñ•µ%‘tì(€€€€€‘…Ñ„¹µ•Ñ„¹¥¹ÍÑ…¹•Q½µ‰ÍÑ½¹•Ì€ôì€¸¸¸¡‘…Ñ„¹µ•Ñ„¹¥¹ÍÑ…¹•Q½µ‰ÍÑ½¹•Ìñðíô¤°m¥Ñ•µ%‘tè‘•±•Ñ•‘Ðôì(€€€ô(€€€½¹ÍÐÍÕµµ…Éä€ôÍÕµµ…É¥é•…Ñ„¡‘…Ñ„¤ì(€€€½¹ÍÐ½µÁ…Ð€ô½µÁ…Ñ½Õ¹Ñ…Ñ„¡‘…Ñ„¤ì(€€€…Ý…¥Ð±¥•¹Ð¹ÅÕ•Éä (€€€€€UAQ…½Õ¹ÑÌMP‘…Ñ„€ô€Èèé©Í½¹ˆ°ÍÕµµ…Éä€ô€Ìèé©Í½¹ˆ°ÕÁ‘…Ñ•‘}…Ð€ô9=\ ¤(€€€€€€€]!IÕÍ•É¹…µ”€ô€Å€°(€€€€€mÕÍ•É¹…µ”°)M=8¹ÍÑÉ¥¹¥™ä¡½µÁ…Ð¤°)M=8¹ÍÑÉ¥¹¥™ä¡ÍÕµµ…Éä¥t°(€€€€¤ì(€€€…Ý…¥Ð±¥•¹Ð¹ÅÕ•Éä ‰=55%Pˆ¤ì(€€€…Ý…¥Ð±½Õ‘¥Ð¡Í•ÍÍ¥½¸¹ÍÕˆ°ÑåÁ”€ôôô€‰Ñ…Í­Ìˆ€ü€‰‘•±•Ñ•}Ñ…Í¬ˆ€è€‰‘•±•Ñ•}É•½Éˆ°ÕÍ•É¹…µ”°ì(€€€€€¥Ñ•µ%°(€€€ô¤ì(€€€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°€ÈÀÀ°ì½¬èÑÉÕ”ô¤ì(€ô…Ñ €¡•ÉÉ½È¤ì(€€€…Ý…¥Ð±¥•¹Ð¹ÅÕ•Éä ‰I=11	,ˆ¤ì(€€€Ñ¡É½Ü•ÉÉ½Èì(€ô™¥¹…±±äì(€€€±¥•¹Ð¹É•±•…Í” ¤ì(€ô)ô()…Íå¹Œ™Õ¹Ñ¥½¸ÕÁ‘…Ñ•½Õ¹Ñ%Ñ•´¡É•ÅÕ•ÍÐ°É•ÍÁ½¹Í”°Í•ÍÍ¥½¸°ÕÍ•É¹…µ”°¥Ñ•µ%°ÕÉ°¤ì(€½¹ÍÐÑåÁ”€ôÕÉ°¹Í•…É¡A…É…µÌ¹•Ð ‰ÑåÁ”ˆ¤€ôôô€‰É•½É‘Ìˆ€ü€‰É•½É‘Ìˆ€è€‰Ñ…Í­Ìˆì(€½¹ÍÐ‰½‘ä€ô…Ý…¥ÐÉ•…‘)Í½¸¡É•ÅÕ•ÍÐ¤ì(€½¹ÍÐ¥¹½µ¥¹œ€ô‰½‘ä¹¥Ñ•´ì(€¥˜€ …¥¹½µ¥¹œñðÑåÁ•½˜¥¹½µ¥¹œ€„ôô€‰½‰©•ÐˆñðÉÉ…ä¹¥ÍÉÉ…ä¡¥¹½µ¥¹œ¤¤ì(€€€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°€ÐÀÀ°ì•ÉÉ½Èè€‹b£f+bŸfbŸb¨ƒbŸfbçfb×bÄƒbëf+bÄƒb×bŸfb·b¤ˆô¤ì(€ô(€½¹ÍÐ±¥•¹Ð€ô…Ý…¥Ð•ÑA½½° ¤¹½¹¹•Ð ¤ì(€ÑÉäì(€€€…Ý…¥Ð±¥•¹Ð¹ÅÕ•Éä ‰	%8ˆ¤ì(€€€½¹ÍÐÉ•ÍÕ±Ð€ô…Ý…¥Ð±¥•¹Ð¹ÅÕ•Éä ‰M1P‘…Ñ„I=4…½Õ¹ÑÌ]!IÕÍ•É¹…µ”€ô€Ä=HUAQˆ°mÕÍ•É¹…µ•t¤ì(€€€¥˜€ …É•ÍÕ±Ð¹É½Ý½Õ¹Ð¤ì(€€€€€…Ý…¥Ð±¥•¹Ð¹ÅÕ•Éä ‰I=11	,ˆ¤ì(€€€€€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°€ÐÀÐ°ì•ÉÉ½Èè€‹bŸfb·bÏbŸb ƒbëf+bÄƒff#b³f#b¼ˆô¤ì(€€€ô(€€€½¹ÍÐ‘…Ñ„€ô¡å‘É…Ñ•½Õ¹Ñ…Ñ„¡É•ÍÕ±Ð¹É½ÝÍlÁt¹‘…Ñ„¤ì(€€€½¹ÍÐÕÁ‘…Ñ•‘Ð€ô¹•Ü…Ñ” ¤¹Ñ½%M=MÑÉ¥¹œ ¤ì(€€€¥˜€¡ÑåÁ”€ôôô€‰Ñ…Í­Ìˆ¤ì(€€€€€½¹ÍÐÑ…Í­Ì€ôÉÉ…ä¹¥ÍÉÉ…ä¡‘…Ñ„¹Ñ…Í­Ì¤€ü‘…Ñ„¹Ñ…Í­Ì€èmtì(€€€€€½¹ÍÐ¥¹‘•à€ôÑ…Í­Ì¹™¥¹‘%¹‘•à ¡¥Ñ•´¤€ôøMÑÉ¥¹œ¡¥Ñ•´ü¹¥ñð€ˆˆ¤€ôôô¥Ñ•µ%¤ì(€€€€€¥˜€¡¥¹‘•à€ð€À¤ì(€€€€€€€…Ý…¥Ð±¥•¹Ð¹ÅÕ•Éä ‰I=11	,ˆ¤ì(€€€€€€€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°€ÐÀÐ°ì•ÉÉ½Èè€‹bŸffffb¤ƒbëf+bÄƒff#b³f#b¿b¤ˆô¤ì(€€€€€ô(€€€€€‘…Ñ„¹Ñ…Í­Ím¥¹‘•át€ôì€¸¸¹¥¹½µ¥¹œ°¥è¥Ñ•µ%°ÕÁ‘…Ñ•‘Ðôì(€€€ô•±Í”ì(€€€€€¥˜€ …‘…Ñ„¹¥¹ÍÑ…¹•Ìü¹m¥Ñ•µ%‘t¤ì(€€€€€€€…Ý…¥Ð±¥•¹Ð¹ÅÕ•Éä ‰I=11	,ˆ¤ì(€€€€€€€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°€ÐÀÐ°ì•ÉÉ½Èè€‹bŸfbÏb³fƒbëf+bÄƒff#b³f#b¼ˆô¤ì(€€€€€ô(€€€€€‘…Ñ„¹¥¹ÍÑ…¹•Ím¥Ñ•µ%‘t€ôì€¸¸¹¥¹½µ¥¹œ°¥è¥Ñ•µ%°ÕÁ‘…Ñ•‘Ðôì(€€€ô(€€€½¹ÍÐÍÕµµ…Éä€ôÍÕµµ…É¥é•…Ñ„¡‘…Ñ„¤ì(€€€½¹ÍÐ½µÁ…Ð€ô½µÁ…Ñ½Õ¹Ñ…Ñ„¡‘…Ñ„¤ì(€€€…Ý…¥Ð±¥•¹Ð¹ÅÕ•Éä (€€€€€UAQ…½Õ¹ÑÌMP‘…Ñ„€ô€Èèé©Í½¹ˆ°ÍÕµµ…Éä€ô€Ìèé©Í½¹ˆ°ÕÁ‘…Ñ•‘}…Ð€ô9=\ ¤(€€€€€€€]!IÕÍ•É¹…µ”€ô€Å€°(€€€€€mÕÍ•É¹…µ”°)M=8¹ÍÑÉ¥¹¥™ä¡½µÁ…Ð¤°)M=8¹ÍÑÉ¥¹¥™ä¡ÍÕµµ…Éä¥t°(€€€€¤ì(€€€…Ý…¥Ð±¥•¹Ð¹ÅÕ•Éä ‰=55%Pˆ¤ì(€€€…Ý…¥Ð±½Õ‘¥Ð¡Í•ÍÍ¥½¸¹ÍÕˆ°ÑåÁ”€ôôô€‰Ñ…Í­Ìˆ€ü€‰ÕÁ‘…Ñ•}Ñ…Í¬ˆ€è€‰ÕÁ‘…Ñ•}É•½Éˆ°ÕÍ•É¹…µ”°ì¥Ñ•µ%ô¤ì(€€€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°€ÈÀÀ°ì½¬èÑÉÕ”ô¤ì(€ô…Ñ €¡•ÉÉ½È¤ì(€€€…Ý…¥Ð±¥•¹Ð¹ÅÕ•Éä ‰I=11	,ˆ¤ì(€€€Ñ¡É½Ü•ÉÉ½Èì(€ô™¥¹…±±äì(€€€±¥•¹Ð¹É•±•…Í” ¤ì(€ô)ô()…Íå¹Œ™Õ¹Ñ¥½¸‘•±•Ñ•½Õ¹Ð¡É•ÍÁ½¹Í”°Í•ÍÍ¥½¸°ÕÍ•É¹…µ”¤ì(€¥˜€¡ÁÉ½Ñ•Ñ•‘UÍ•É¹…µ•Ì¹¡…Ì¡ÕÍ•É¹…µ”¤¤ì(€€€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°€ÐÀÌ°ì•ÉÉ½Èè€‹fbÃbœƒbŸfb·bÏbŸb ƒfb·ff(ƒf#fbœƒf+fffƒb·bÃffˆô¤ì(€ô(€½¹ÍÐÉ•ÍÕ±Ð€ô…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä ‰1QI=4…½Õ¹ÑÌ]!IÕÍ•É¹…µ”€ô€Äˆ°mÕÍ•É¹…µ•t¤ì(€¥˜€ …É•ÍÕ±Ð¹É½Ý½Õ¹Ð¤É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°€ÐÀÐ°ì•ÉÉ½Èè€‹bŸfb·bÏbŸb ƒbëf+bÄƒff#b³f#b¼ˆô¤ì(€…Ý…¥Ð±½Õ‘¥Ð¡Í•ÍÍ¥½¸¹ÍÕˆ°€‰‘•±•Ñ•}…½Õ¹Ðˆ°ÕÍ•É¹…µ”°íô¤ì(€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°€ÈÀÀ°ì½¬èÑÉÕ”ô¤ì)ô()…Íå¹Œ™Õ¹Ñ¥½¸±¥ÍÑÕ‘¥Ð¡É•ÍÁ½¹Í”°ÕÉ°¤ì(€½¹ÍÐì±¥µ¥Ð°½™™Í•Ðô€ôÁ…¥¹…Ñ¥½¸¡ÕÉ°¹Í•…É¡A…É…µÌ¹•Ð ‰±¥µ¥Ðˆ¤°ÕÉ°¹Í•…É¡A…É…µÌ¹•Ð ‰½™™Í•Ðˆ¤¤ì(€½¹ÍÐmÉ½ÝÌ°½Õ¹Ñt€ô…Ý…¥ÐAÉ½µ¥Í”¹…±°¡l(€€€•ÑA½½° ¤¹ÅÕ•Éä (€€€€€M1P¥°…‘µ¥¹}ÕÍ•É¹…µ”°…Ñ¥½¸°Ñ…É•Ñ}ÕÍ•É¹…µ”°‘•Ñ…¥±Ì°É•…Ñ•‘}…Ð(€€€€€€€€I=4…‘µ¥¹}…Õ‘¥Ñ}±½œ=IH	dÉ•…Ñ•‘}…ÐM1%5%P€Ä=MP€É€°(€€€€€m±¥µ¥Ð°½™™Í•Ñt°(€€€€¤°(€€€•ÑA½½° ¤¹ÅÕ•Éä ‰M1P½Õ¹Ð ¨¤èé‰¥¥¹ÐLÑ½Ñ…°I=4…‘µ¥¹}…Õ‘¥Ñ}±½œˆ¤°(€t¤ì(€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°€ÈÀÀ°ì(€€€¥Ñ•µÌèÉ½ÝÌ¹É½ÝÌ°(€€€Ñ½Ñ…°è9Õµ‰•È¡½Õ¹Ð¹É½ÝÍlÁt¹Ñ½Ñ…°¤°(€€€±¥µ¥Ð°(€€€½™™Í•Ð°(€ô¤ì)ô()…Íå¹Œ™Õ¹Ñ¥½¸…½Õ¹Ñ…Ñ„¡ÕÍ•É¹…µ”¤ì(€½¹ÍÐÉ•ÍÕ±Ð€ô…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä ‰M1P‘…Ñ„I=4…½Õ¹ÑÌ]!IÕÍ•É¹…µ”€ô€Äˆ°mÕÍ•É¹…µ•t¤ì(€É•ÑÕÉ¸É•ÍÕ±Ð¹É½Ý½Õ¹Ð€ü¡å‘É…Ñ•½Õ¹Ñ…Ñ„¡É•ÍÕ±Ð¹É½ÝÍlÁt¹‘…Ñ„¤€è¹Õ±°ì)ô()™Õ¹Ñ¥½¸‰Õ¥±‘Ñ¥Ù¥ÑåMÕµµ…Éä¡‘…Ñ„¤ì(€½¹ÍÐÉ•½É‘Ì€ô=‰©•Ð¹Ù…±Õ•Ì¡‘…Ñ„¹¥¹ÍÑ…¹•Ìñðíô¤¹™¥±Ñ•È (€€€€¡¥Ñ•´¤€ôø€½yq‘ìÑôµq‘ìÉôµq‘ìÉô¼¹Ñ•ÍÐ¡MÑÉ¥¹œ¡¥Ñ•´ü¹‘…Ñ”ñð€ˆˆ¤¤°(€€¤ì(€½¹ÍÐå•…ÉÌ€ôÉÉ…ä¹™É½´¡¹•ÜM•Ð¡É•½É‘Ì¹µ…À ¡¥Ñ•´¤€ôø9Õµ‰•È¡MÑÉ¥¹œ¡¥Ñ•´¹‘…Ñ”¤¹Í±¥” À°€Ð¤¤¤¤¤(€€€€¹™¥±Ñ•È¡9Õµ‰•È¹¥Í¥¹¥Ñ”¤(€€€€¹Í½ÉÐ ¡„°ˆ¤€ôøˆ€´„¤ì(€½¹ÍÐÕÉÉ•¹Ñe•…È€ô9Õµ‰•È¡±½…±…Ñ” ¤¹Í±¥” À°€Ð¤¤ì(€¥˜€ …å•…ÉÌ¹¥¹±Õ‘•Ì¡ÕÉÉ•¹Ñe•…È¤¤å•…ÉÌ¹Õ¹Í¡¥™Ð¡ÕÉÉ•¹Ñe•…È¤ì(€½¹ÍÐ‰åe•…È€ô=‰©•Ð¹™É½µ¹ÑÉ¥•Ì¡å•…ÉÌ¹µ…À ¡å•…È¤€ôøl(€€€å•…È°(€€€ÉÉ…ä¹™É½´¡ì±•¹Ñ è€ÄÈô°€¡|°¥¹‘•à¤€ôøì(€€€€€½¹ÍÐµ½¹Ñ €ô¥¹‘•à€¬€Äì(€€€€€½¹ÍÐÁÉ•™¥à€ô€‘íå•…Éô´‘íMÑÉ¥¹œ¡µ½¹Ñ ¤¹Á…‘MÑ…ÉÐ È°€ˆÀˆ¥õ€ì(€€€€€½¹ÍÐ¥Ñ•µÌ€ôÉ•½É‘Ì¹™¥±Ñ•È ¡¥Ñ•´¤€ôøMÑÉ¥¹œ¡¥Ñ•´¹‘…Ñ”¤¹ÍÑ…ÉÑÍ]¥Ñ ¡ÁÉ•™¥à¤¤ì(€€€€€É•ÑÕÉ¸ì(€€€€€€€µ½¹Ñ °(€€€€€€€Ñ½Ñ…°è¥Ñ•µÌ¹±•¹Ñ °(€€€€€€€½µÁ±•Ñ•è¥Ñ•µÌ¹™¥±Ñ•È ¡¥Ñ•´¤€ôø¥Ñ•´¹ÍÑ…ÑÕÌ€ôôô€‰½µÁ±•Ñ•ˆ¤¹±•¹Ñ °(€€€€€€€Á•¹‘¥¹œè¥Ñ•µÌ¹™¥±Ñ•È ¡¥Ñ•´¤€ôø¥Ñ•´¹ÍÑ…ÑÕÌ€ôôô€‰µ…¥¸ˆ¤¹±•¹Ñ °(€€€€€€€µ¥ÍÍ•è¥Ñ•µÌ¹™¥±Ñ•È ¡¥Ñ•´¤€ôø(€€€€€€€€€l‰É•ÅÕ¥É•‘=Ù•É‘Õ”ˆ°€‰½ÁÑ¥½¹…±=Ù•É‘Õ”ˆ°€‰¹•Ù•È‰t¹¥¹±Õ‘•Ì¡¥Ñ•´¹ÍÑ…ÑÕÌ¤°(€€€€€€€€¤¹±•¹Ñ °(€€€€€€€‰åÑ•Ìè©Í½¹	åÑ•Ì¡¥Ñ•µÌ¤°(€€€€€ôì(€€€ô¤°(€t¤¤ì(€É•ÑÕÉ¸ì(€€€å•…ÉÌ°(€€€‰åe•…È°(€€€Ñ½‘…äè‘…åMÕµµ…Éä¡É•½É‘Ì°±½…±…Ñ” ¤¤°(€€€å•ÍÑ•É‘…äè‘…åMÕµµ…Éä¡É•½É‘Ì°±½…±…Ñ” ´Ä¤¤°(€ôì)ô()™Õ¹Ñ¥½¸‘…åMÕµµ…Éä¡É•½É‘Ì°‘…Ñ”¤ì(€½¹ÍÐ¥Ñ•µÌ€ôÉ•½É‘Ì¹™¥±Ñ•È ¡¥Ñ•´¤€ôø¥Ñ•´¹‘…Ñ”€ôôô‘…Ñ”¤ì(€É•ÑÕÉ¸ì(€€€‘…Ñ”°(€€€Ñ½Ñ…°è¥Ñ•µÌ¹±•¹Ñ °(€€€½µÁ±•Ñ•è¥Ñ•µÌ¹™¥±Ñ•È ¡¥Ñ•´¤€ôø¥Ñ•´¹ÍÑ…ÑÕÌ€ôôô€‰½µÁ±•Ñ•ˆ¤¹±•¹Ñ °(€€€¥Ñ•µÌè¥Ñ•µÌ¹Í±¥” À°€ÈÀ¤¹µ…À ¡¥Ñ•´¤€ôø€¡ì(€€€€€¥è¥Ñ•´¹¥°(€€€€€Ñ¥Ñ±”è¥Ñ•´¹Ñ¥Ñ±”°(€€€€€ÍÑ…ÑÕÌè¥Ñ•´¹ÍÑ…ÑÕÌ°(€€€€€Ñ¥µ”è¥Ñ•´¹Ñ¥µ”°(€€€€€½µÁ±•Ñ•‘Ðè¥Ñ•´¹½µÁ±•Ñ•‘Ðñð¹Õ±°°(€€€ô¤¤°(€ôì)ô()™Õ¹Ñ¥½¸±½…±…Ñ”¡‘…å=™™Í•Ð€ô€À¤ì(€½¹ÍÐÙ…±Õ”€ô¹•Ü…Ñ”¡…Ñ”¹¹½Ü ¤€¬‘…å=™™Í•Ð€¨€àÙ|ÐÀÁ|ÀÀÀ¤ì(€½¹ÍÐÁ…ÉÑÌ€ô=‰©•Ð¹™É½µ¹ÑÉ¥•Ì¡¹•Ü%¹Ñ°¹…Ñ•Q¥µ•½Éµ…Ð ‰•¸ˆ°ì(€€€Ñ¥µ•i½¹”èÁÉ½•ÍÌ¹•¹Ø¹AA}Q%5}i=9ñð€‰Í¥„½I¥å…‘ ˆ°(€€€å•…Èè€‰¹Õµ•É¥Œˆ°(€€€µ½¹Ñ è€ˆÈµ‘¥¥Ðˆ°(€€€‘…äè€ˆÈµ‘¥¥Ðˆ°(€ô¤¹™½Éµ…ÑQ½A…ÉÑÌ¡Ù…±Õ”¤¹µ…À ¡Á…ÉÐ¤€ôømÁ…ÉÐ¹ÑåÁ”°Á…ÉÐ¹Ù…±Õ•t¤¤ì(€É•ÑÕÉ¸€‘íÁ…ÉÑÌ¹å•…Éô´‘íÁ…ÉÑÌ¹µ½¹Ñ¡ô´‘íÁ…ÉÑÌ¹‘…åõ€ì)ô()™Õ¹Ñ¥½¸©Í½¹	åÑ•Ì¡Ù…±Õ”¤ì(€É•ÑÕÉ¸	Õ™™•È¹‰åÑ•1•¹Ñ ¡)M=8¹ÍÑÉ¥¹¥™ä¡Ù…±Õ”€üü¹Õ±°¤°€‰ÕÑ˜àˆ¤ì)ô()™Õ¹Ñ¥½¸‰½Õ¹‘•‘%¹Ñ••È¡Ù…±Õ”°µ¥¸°µ…à¤ì(€½¹ÍÐ¹Õµ‰•È€ô9Õµ‰•È¹Á…ÉÍ•%¹Ð¡Ù…±Õ”°€ÄÀ¤ì(€É•ÑÕÉ¸9Õµ‰•È¹¥Í%¹Ñ••È¡¹Õµ‰•È¤€˜˜¹Õµ‰•È€øôµ¥¸€˜˜¹Õµ‰•È€ðôµ…à€ü¹Õµ‰•È€è¹Õ±°ì)ô()…Íå¹Œ™Õ¹Ñ¥½¸Í•ÍÍ¥½¹½Õ¹Ð ¤ì(€½¹ÍÐÉ•ÍÕ±Ð€ô…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä ‰M1P½Õ¹Ð ¨¤èé‰¥¥¹ÐLÑ½Ñ…°I=4…½Õ¹Ñ}Í•ÍÍ¥½¹Ìˆ¤ì(€É•ÑÕÉ¸9Õµ‰•È¡É•ÍÕ±Ð¹É½ÝÍlÁt¹Ñ½Ñ…°¤ì)ô()™Õ¹Ñ¥½¸ÁÕ‰±¥½Õ¹ÑI½Ü¡É½Ü¤ì(€É•ÑÕÉ¸ì(€€€ÕÍ•É¹…µ”èÉ½Ü¹ÕÍ•É¹…µ”°(€€€¹…µ”èÉ½Ü¹¹…µ”°(€€€•µ…¥°èÉ½Ü¹•µ…¥°°(€€€É•…Ñ•‘ÐèÉ½Ü¹É•…Ñ•‘}…Ð°(€€€ÕÁ‘…Ñ•‘ÐèÉ½Ü¹ÕÁ‘…Ñ•‘}…Ð°(€€€‘…Ñ…	åÑ•Ìè9Õµ‰•È¡É½Ü¹‘…Ñ…}‰åÑ•Ìñð€À¤°(€ôì)ô()…Íå¹Œ™Õ¹Ñ¥½¸±½Õ‘¥Ð¡…‘µ¥¹UÍ•É¹…µ”°…Ñ¥½¸°Ñ…É•ÑUÍ•É¹…µ”°‘•Ñ…¥±Ì¤ì(€…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä (€€€%9MIP%9Q<…‘µ¥¹}…Õ‘¥Ñ}±½œ€¡…‘µ¥¹}ÕÍ•É¹…µ”°…Ñ¥½¸°Ñ…É•Ñ}ÕÍ•É¹…µ”°‘•Ñ…¥±Ì¤(€€€€Y1UL€ Ä°€È°€Ì°€Ðèé©Í½¹ˆ¥€°(€€€m…‘µ¥¹UÍ•É¹…µ”°…Ñ¥½¸°Ñ…É•ÑUÍ•É¹…µ”ñð€ˆˆ°)M=8¹ÍÑÉ¥¹¥™ä¡‘•Ñ…¥±Ìñðíô¥t°(€€¤ì)ô()™Õ¹Ñ¥½¸•¹ÍÕÉ•Õ‘¥ÑM¡•µ„ ¤ì(€¥˜€ …Í¡•µ…AÉ½µ¥Í”¤ì(€€€Í¡•µ…AÉ½µ¥Í”€ô•ÑA½½° ¤(€€€€€€¹ÅÕ•Éä (€€€€€€€IQQ	1%9=Pa%MQL…‘µ¥¹}…Õ‘¥Ñ}±½œ€ (€€€€€€€€€€¥	%MI%0AI%5Id-d°(€€€€€€€€€€…‘µ¥¹}ÕÍ•É¹…µ”QaP9=P9U10°(€€€€€€€€€€…Ñ¥½¸QaP9=P9U10°(€€€€€€€€€€Ñ…É•Ñ}ÕÍ•É¹…µ”QaP9=P9U10U1P€œœ°(€€€€€€€€€€‘•Ñ…¥±Ì)M=99=P9U10U1P€íôœèé©Í½¹ˆ°(€€€€€€€€€€É•…Ñ•‘}…ÐQ%5MQ5AQh9=P9U10U1P9=\ ¤(€€€€€€€€€¤ì(€€€€€€€€IQ%9`%9=Pa%MQL…‘µ¥¹}…Õ‘¥Ñ}±½}É•…Ñ•‘}…Ñ}¥‘à(€€€€€€€€€€=8…‘µ¥¹}…Õ‘¥Ñ}±½œ€¡É•…Ñ•‘}…ÐM¤í€°(€€€€€€¤(€€€€€€¹…Ñ  ¡•ÉÉ½È¤€ôøì(€€€€€€€Í¡•µ…AÉ½µ¥Í”€ô¹Õ±°ì(€€€€€€€Ñ¡É½Ü•ÉÉ½Èì(€€€€€ô¤ì(€ô(€É•ÑÕÉ¸Í¡•µ…AÉ½µ¥Í”ì)ô()™Õ¹Ñ¥½¸•ÑA½½° ¤ì(€¥˜€ …ÁÉ½•ÍÌ¹•¹Ø¹Q	M}UI0¤Ñ¡É½Ü¹•ÜÉÉ½È ‰Q	M}UI0ƒbëf+bÄƒfbÛb£f#bÜˆ¤ì(€¥˜€ …Á½½°¤ì(€€€½¹ÍÐ½¹¹•Ñ¥½¹MÑÉ¥¹œ€ôÁÉ½•ÍÌ¹•¹Ø¹Q	M}UI0ì(€€€½¹ÍÐ½¹™¥œ€ôì(€€€€€½¹¹•Ñ¥½¹MÑÉ¥¹œ°(€€€€€µ…àè5…Ñ ¹µ¥¸ ÄÀ°5…Ñ ¹µ…à Ä°9Õµ‰•È¡ÁÉ½•ÍÌ¹•¹Ø¹A}A==1}5`ñð€Ð¤¤¤°(€€€€€¥‘±•Q¥µ•½ÕÑ5¥±±¥Ìè€ÌÁ|ÀÀÀ°(€€€€€½¹¹•Ñ¥½¹Q¥µ•½ÕÑ5¥±±¥Ìè€ÄÁ|ÀÀÀ°(€€€ôì(€€€¥˜€ ½ÍÍ±µ½‘”õÉ•ÅÕ¥É”½¤¹Ñ•ÍÐ¡½¹¹•Ñ¥½¹MÑÉ¥¹œ¤ñð€½p¹É•¹‘•Ép¹½´½¤¹Ñ•ÍÐ¡½¹¹•Ñ¥½¹MÑÉ¥¹œ¤¤ì(€€€€€½¹™¥œ¹ÍÍ°€ôìÉ•©•ÑU¹…ÕÑ¡½É¥é•è™…±Í”ôì(€€€ô(€€€Á½½°€ô¹•ÜA½½°¡½¹™¥œ¤ì(€€€Á½½°¹½¸ ‰•ÉÉ½Èˆ°€¡•ÉÉ½È¤€ôø½¹Í½±”¹•ÉÉ½È ‰…Ñ…‰…Í”Á½½°•ÉÉ½Èˆ°•ÉÉ½È¤¤ì(€ô(€É•ÑÕÉ¸Á½½°ì)ô()™Õ¹Ñ¥½¸Í•ÍÍ¥½¹I•ÍÁ½¹Í”¡Í•ÍÍ¥½¸¤ì(€É•ÑÕÉ¸ì(€€€…ÕÑ¡•¹Ñ¥…Ñ•èÑÉÕ”°(€€€ÕÍ•É¹…µ”èÍ•ÍÍ¥½¸¹ÍÕˆ°(€€€ÍÉ™Q½­•¸èÍ•ÍÍ¥½¸¹ÍÉ˜°(€€€•áÁ¥É•ÍÐè¹•Ü…Ñ”¡Í•ÍÍ¥½¸¹•áÀ€¨€ÄÀÀÀ¤¹Ñ½%M=MÑÉ¥¹œ ¤°(€ôì)ô()™Õ¹Ñ¥½¸Í¥¹M•ÍÍ¥½¸¡Á…å±½…¤ì(€½¹ÍÐ•¹½‘•€ô	Õ™™•È¹™É½´¡)M=8¹ÍÑÉ¥¹¥™ä¡Á…å±½…¤¤¹Ñ½MÑÉ¥¹œ ‰‰…Í”ØÑÕÉ°ˆ¤ì(€½¹ÍÐÍ¥¹…ÑÕÉ”€ôÉåÁÑ¼(€€€€¹É•…Ñ•!µ…Œ ‰Í¡„ÈÔØˆ°Í•ÍÍ¥½¹M•É•Ð ¤¤(€€€€¹ÕÁ‘…Ñ”¡•¹½‘•¤(€€€€¹‘¥•ÍÐ ‰‰…Í”ØÑÕÉ°ˆ¤ì(€É•ÑÕÉ¸€‘í•¹½‘•‘ô¸‘íÍ¥¹…ÑÕÉ•õ€ì)ô()™Õ¹Ñ¥½¸É•…‘‘µ¥¹M•ÍÍ¥½¸¡É•ÅÕ•ÍÐ¤ì(€½¹ÍÐÑ½­•¸€ôÁ…ÉÍ•½½­¥•Ì¡É•ÅÕ•ÍÐ¹¡•…‘•ÉÌ¹½½­¥”ñð€ˆˆ¥m½½­¥•9…µ•tì(€¥˜€ …Ñ½­•¸¤É•ÑÕÉ¸¹Õ±°ì(€½¹ÍÐm•¹½‘•°Í¥¹…ÑÕÉ•t€ôÑ½­•¸¹ÍÁ±¥Ð ˆ¸ˆ¤ì(€¥˜€ …•¹½‘•ñð€…Í¥¹…ÑÕÉ”¤É•ÑÕÉ¸¹Õ±°ì(€½¹ÍÐ•áÁ•Ñ•€ôÉåÁÑ¼¹É•…Ñ•!µ…Œ ‰Í¡„ÈÔØˆ°Í•ÍÍ¥½¹M•É•Ð ¤¤¹ÕÁ‘…Ñ”¡•¹½‘•¤¹‘¥•ÍÐ ‰‰…Í”ØÑÕÉ°ˆ¤ì(€¥˜€ …½¹ÍÑ…¹ÑQ¥µ•ÅÕ…°¡Í¥¹…ÑÕÉ”°•áÁ•Ñ•¤¤É•ÑÕÉ¸¹Õ±°ì(€ÑÉäì(€€€½¹ÍÐÁ…å±½…€ô)M=8¹Á…ÉÍ”¡	Õ™™•È¹™É½´¡•¹½‘•°€‰‰…Í”ØÑÕÉ°ˆ¤¹Ñ½MÑÉ¥¹œ ‰ÕÑ˜àˆ¤¤ì(€€€½¹ÍÐ•áÁ•Ñ•‘UÍ•È€ôMÑÉ¥¹œ¡ÁÉ½•ÍÌ¹•¹Ø¹5%9}UMI95ñð€ˆˆ¤ì(€€€¥˜€ (€€€€€Á…å±½…¹•áÀ€ðô5…Ñ ¹™±½½È¡…Ñ”¹¹½Ü ¤€¼€ÄÀÀÀ¤ñð(€€€€€€…½¹ÍÑ…¹ÑQ¥µ•ÅÕ…°¡MÑÉ¥¹œ¡Á…å±½…¹ÍÕˆñð€ˆˆ¤¹Ñ½1½Ý•É…Í” ¤°•áÁ•Ñ•‘UÍ•È¹Ñ½1½Ý•É…Í” ¤¤(€€€€¤ì(€€€€€É•ÑÕÉ¸¹Õ±°ì(€€€ô(€€€É•ÑÕÉ¸Á…å±½…ì(€ô…Ñ ì(€€€É•ÑÕÉ¸¹Õ±°ì(€ô)ô()™Õ¹Ñ¥½¸Í•ÍÍ¥½¹M•É•Ð ¤ì(€½¹ÍÐÍ•É•Ð€ôMÑÉ¥¹œ¡ÁÉ½•ÍÌ¹•¹Ø¹MMM%=9}MIPñð€ˆˆ¤ì(€¥˜€¡Í•É•Ð¹±•¹Ñ €ð€ÌÈ¤Ñ¡É½Ü¹•ÜÉÉ½È ‰MMM%=9}MIPƒf+b³b ƒbfƒf+ff#f€ÌÈƒb·bÇff/bœƒbçff$ƒbŸfbffˆ¤ì(€É•ÑÕÉ¸Í•É•Ðì)ô()™Õ¹Ñ¥½¸Í•ÑM•ÍÍ¥½¹½½­¥”¡É•ÅÕ•ÍÐ°É•ÍÁ½¹Í”°Ñ½­•¸¤ì(€½¹ÍÐÍ•ÕÉ”€ôÁÉ½•ÍÌ¹•¹Ø¹9=}9X€ôôô€‰ÁÉ½‘ÕÑ¥½¸ˆñðÉ•ÅÕ•ÍÐ¹¡•…‘•ÉÍl‰àµ™½ÉÝ…É‘•µÁÉ½Ñ¼‰t€ôôô€‰¡ÑÑÁÌˆì(€É•ÍÁ½¹Í”¹Í•Ñ!•…‘•È (€€€€‰M•Ðµ½½­¥”ˆ°(€€€€‘í½½­¥•9…µ•ôô‘íÑ½­•¹ôì!ÑÑÁ=¹±äìM…µ•M¥Ñ”õMÑÉ¥ÐìA…Ñ ô¼ì5…àµ”ô‘íÍ•ÍÍ¥½¹!½ÕÉÌ€¨€ÌØÀÁô‘íÍ•ÕÉ”€ü€ˆìM•ÕÉ”ˆ€è€ˆ‰õ€°(€€¤ì)ô()™Õ¹Ñ¥½¸±•…ÉM•ÍÍ¥½¹½½­¥”¡É•ÅÕ•ÍÐ°É•ÍÁ½¹Í”¤ì(€½¹ÍÐÍ•ÕÉ”€ôÁÉ½•ÍÌ¹•¹Ø¹9=}9X€ôôô€‰ÁÉ½‘ÕÑ¥½¸ˆñðÉ•ÅÕ•ÍÐ¹¡•…‘•ÉÍl‰àµ™½ÉÝ…É‘•µÁÉ½Ñ¼‰t€ôôô€‰¡ÑÑÁÌˆì(€É•ÍÁ½¹Í”¹Í•Ñ!•…‘•È (€€€€‰M•Ðµ½½­¥”ˆ°(€€€€‘í½½­¥•9…µ•ôôì!ÑÑÁ=¹±äìM…µ•M¥Ñ”õMÑÉ¥ÐìA…Ñ ô¼ì5…àµ”ôÀ‘íÍ•ÕÉ”€ü€ˆìM•ÕÉ”ˆ€è€ˆ‰õ€°(€€¤ì)ô()™Õ¹Ñ¥½¸Á…ÉÍ•½½­¥•Ì¡¡•…‘•È¤ì(€É•ÑÕÉ¸=‰©•Ð¹™É½µ¹ÑÉ¥•Ì (€€€¡•…‘•È(€€€€€€¹ÍÁ±¥Ð ˆìˆ¤(€€€€€€¹µ…À ¡Á…ÉÐ¤€ôøÁ…ÉÐ¹ÑÉ¥´ ¤¹ÍÁ±¥Ð ˆôˆ¤¤(€€€€€€¹™¥±Ñ•È ¡m­•ä°Ù…±Õ•t¤€ôø­•ä€˜˜Ù…±Õ”¤(€€€€€€¹µ…À ¡m­•ä°€¸¸¹Ù…±Õ•t¤€ôøm­•ä°Ù…±Õ”¹©½¥¸ ˆôˆ¥t¤°(€€¤ì)ô()™Õ¹Ñ¥½¸½¹ÍÑ…¹ÑQ¥µ•ÅÕ…°¡™¥ÉÍÐ°Í•½¹¤ì(€½¹ÍÐ±•™Ð€ô	Õ™™•È¹™É½´¡MÑÉ¥¹œ¡™¥ÉÍÐ¤¤ì(€½¹ÍÐÉ¥¡Ð€ô	Õ™™•È¹™É½´¡MÑÉ¥¹œ¡Í•½¹¤¤ì(€¥˜€¡±•™Ð¹±•¹Ñ €„ôôÉ¥¡Ð¹±•¹Ñ ¤ì(€€€ÉåÁÑ¼¹Ñ¥µ¥¹M…™•ÅÕ…°¡±•™Ð°	Õ™™•È¹…±±½Œ¡±•™Ð¹±•¹Ñ ¤¤ì(€€€É•ÑÕÉ¸™…±Í”ì(€ô(€É•ÑÕÉ¸ÉåÁÑ¼¹Ñ¥µ¥¹M…™•ÅÕ…°¡±•™Ð°É¥¡Ð¤ì)ô()™Õ¹Ñ¥½¸¥ÍI…Ñ•1¥µ¥Ñ•¡¥À¤ì(€½¹ÍÐÕÑ½™˜€ô…Ñ”¹¹½Ü ¤€´€ÄÔ€¨€ØÁ|ÀÀÀì(€½¹ÍÐ…ÑÑ•µÁÑÌ€ô€¡±½¥¹ÑÑ•µÁÑÌ¹•Ð¡¥À¤ñðmt¤¹™¥±Ñ•È ¡Ñ¥µ”¤€ôøÑ¥µ”€øÕÑ½™˜¤ì(€±½¥¹ÑÑ•µÁÑÌ¹Í•Ð¡¥À°…ÑÑ•µÁÑÌ¤ì(€É•ÑÕÉ¸…ÑÑ•µÁÑÌ¹±•¹Ñ €øô€Øì)ô()™Õ¹Ñ¥½¸É•½É‘…¥±ÕÉ”¡¥À¤ì(€±½¥¹ÑÑ•µÁÑÌ¹Í•Ð¡¥À°l¸¸¸¡±½¥¹ÑÑ•µÁÑÌ¹•Ð¡¥À¤ñðmt¤°…Ñ”¹¹½Ü ¥t¹Í±¥” ´Ø¤¤ì)ô()™Õ¹Ñ¥½¸±•…É…¥±ÕÉ•Ì¡¥À¤ì(€±½¥¹ÑÑ•µÁÑÌ¹‘•±•Ñ”¡¥À¤ì)ô()™Õ¹Ñ¥½¸±¥•¹Ñ%À¡É•ÅÕ•ÍÐ¤ì(€É•ÑÕÉ¸MÑÉ¥¹œ¡É•ÅÕ•ÍÐ¹¡•…‘•ÉÍl‰àµ™½ÉÝ…É‘•µ™½È‰tñðÉ•ÅÕ•ÍÐ¹Í½­•Ð¹É•µ½Ñ•‘‘É•ÍÌñð€ˆˆ¤(€€€€¹ÍÁ±¥Ð ˆ°ˆ¥lÁt(€€€€¹ÑÉ¥´ ¤(€€€€¹Í±¥” À°€àÀ¤ì)ô()™Õ¹Ñ¥½¸¥Í5ÕÑ…Ñ¥½¸¡µ•Ñ¡½¤ì(€É•ÑÕÉ¸l‰A=MPˆ°€‰AQ ˆ°€‰AUPˆ°€‰1Q‰t¹¥¹±Õ‘•Ì¡µ•Ñ¡½ñð€ˆˆ¤ì)ô()…Íå¹Œ™Õ¹Ñ¥½¸É•…‘)Í½¸¡É•ÅÕ•ÍÐ¤ì(€½¹ÍÐ¡Õ¹­Ì€ômtì(€±•ÐÍ¥é”€ô€Àì(€™½È…Ý…¥Ð€¡½¹ÍÐ¡Õ¹¬½˜É•ÅÕ•ÍÐ¤ì(€€€Í¥é”€¬ô¡Õ¹¬¹±•¹Ñ ì(€€€¥˜€¡Í¥é”€ø€ÈÔØ€¨€ÄÀÈÐ¤Ñ¡É½Ü¹•ÜÉÉ½È ‹bŸfbßfb ƒbfb£bÄƒffƒbŸfb·b¼ƒbŸffbÏff#b´ˆ¤ì(€€€¡Õ¹­Ì¹ÁÕÍ ¡¡Õ¹¬¤ì(€ô(€¥˜€ …¡Õ¹­Ì¹±•¹Ñ ¤É•ÑÕÉ¸íôì(€ÑÉäì(€€€É•ÑÕÉ¸)M=8¹Á…ÉÍ”¡	Õ™™•È¹½¹…Ð¡¡Õ¹­Ì¤¹Ñ½MÑÉ¥¹œ ‰ÕÑ˜àˆ¤¤ì(€ô…Ñ ì(€€€Ñ¡É½Ü¹•ÜÉÉ½È ‹b×f+bëb¤)M=8ƒbëf+bÄƒb×bŸfb·b¤ˆ¤ì(€ô)ô()…Íå¹Œ™Õ¹Ñ¥½¸Í•ÉÙ•MÑ…Ñ¥Œ¡É•ÅÕ•ÍÐ°É•ÍÁ½¹Í”°Á…Ñ¡¹…µ”¤ì(€¥˜€¡É•ÅÕ•ÍÐ¹µ•Ñ¡½€„ôô€‰Pˆ€˜˜É•ÅÕ•ÍÐ¹µ•Ñ¡½€„ôô€‰!ˆ¤ì(€€€É•ÑÕÉ¸Í•¹‘Q•áÐ¡É•ÍÁ½¹Í”°€ÐÀÔ°€‰5•Ñ¡½¹½Ð…±±½Ý•ˆ¤ì(€ô(€½¹ÍÐÉ•ÅÕ•ÍÑ•€ôÁ…Ñ¡¹…µ”€ôôô€ˆ¼ˆ€ü€ˆ½¥¹‘•à¹¡Ñµ°ˆ€èÁ…Ñ¡¹…µ”ì(€¥˜€ …ÍÑ…Ñ¥¥±•Ì¹¡…Ì¡É•ÅÕ•ÍÑ•¤¤É•ÑÕÉ¸Í•¹‘Q•áÐ¡É•ÍÁ½¹Í”°€ÐÀÐ°€‰9½Ð™½Õ¹ˆ¤ì(€½¹ÍÐ™¥±•A…Ñ €ôÁ…Ñ ¹©½¥¸¡É½½Ñ¥È°É•ÅÕ•ÍÑ•¹Í±¥” Ä¤¤ì(€½¹ÍÐ¥¹™¼€ô…Ý…¥ÐÍÑ…Ð¡™¥±•A…Ñ ¤¹…Ñ   ¤€ôø¹Õ±°¤ì(€¥˜€ …¥¹™¼ü¹¥Í¥±” ¤¤É•ÑÕÉ¸Í•¹‘Q•áÐ¡É•ÍÁ½¹Í”°€ÐÀÐ°€‰9½Ð™½Õ¹ˆ¤ì(€É•ÍÁ½¹Í”¹ÝÉ¥Ñ•!•… ÈÀÀ°ì(€€€€¸¸¹Í•ÕÉ¥Ñå!•…‘•ÉÌ°(€€€€‰½¹Ñ•¹ÐµQåÁ”ˆè½¹Ñ•¹ÑQåÁ”¡Á…Ñ ¹•áÑ¹…µ”¡™¥±•A…Ñ ¤¤°(€€€€‰½¹Ñ•¹Ðµ1•¹Ñ ˆè¥¹™¼¹Í¥é”°(€€€€‰…¡”µ½¹ÑÉ½°ˆèÉ•ÅÕ•ÍÑ•€ôôô€ˆ½¥¹‘•à¹¡Ñµ°ˆ€ü€‰¹¼µ…¡”ˆ€è€‰ÁÕ‰±¥Œ°µ…àµ…”ôÌØÀÀˆ°(€ô¤ì(€¥˜€¡É•ÅÕ•ÍÐ¹µ•Ñ¡½€ôôô€‰!ˆ¤É•ÑÕÉ¸É•ÍÁ½¹Í”¹•¹ ¤ì(€É•…Ñ•I•…‘MÑÉ•…´¡™¥±•A…Ñ ¤¹Á¥Á”¡É•ÍÁ½¹Í”¤ì)ô()™Õ¹Ñ¥½¸½¹Ñ•¹ÑQåÁ”¡•áÑ•¹Í¥½¸¤ì(€É•ÑÕÉ¸ì(€€€€ˆ¹¡Ñµ°ˆè€‰Ñ•áÐ½¡Ñµ°ì¡…ÉÍ•ÐõÕÑ˜´àˆ°(€€€€ˆ¹ÍÌˆè€‰Ñ•áÐ½ÍÌì¡…ÉÍ•ÐõÕÑ˜´àˆ°(€€€€ˆ¹©Ìˆè€‰Ñ•áÐ½©…Ù…ÍÉ¥ÁÐì¡…ÉÍ•ÐõÕÑ˜´àˆ°(€€€€ˆ¹ÍÙœˆè€‰¥µ…”½ÍÙœ­áµ°ˆ°(€õm•áÑ•¹Í¥½¹tñð€‰…ÁÁ±¥…Ñ¥½¸½½Ñ•ÐµÍÑÉ•…´ˆì)ô()™Õ¹Ñ¥½¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°ÍÑ…ÑÕÌ°Ù…±Õ”¤ì(€½¹ÍÐ‰½‘ä€ô)M=8¹ÍÑÉ¥¹¥™ä¡Ù…±Õ”¤ì(€É•ÍÁ½¹Í”¹ÝÉ¥Ñ•!•…¡ÍÑ…ÑÕÌ°ì(€€€€¸¸¹Í•ÕÉ¥Ñå!•…‘•ÉÌ°(€€€€‰…¡”µ½¹ÑÉ½°ˆè€‰¹¼µÍÑ½É”ˆ°(€€€€‰½¹Ñ•¹ÐµQåÁ”ˆè€‰…ÁÁ±¥…Ñ¥½¸½©Í½¸ì¡…ÉÍ•ÐõÕÑ˜´àˆ°(€€€€‰½¹Ñ•¹Ðµ1•¹Ñ ˆè	Õ™™•È¹‰åÑ•1•¹Ñ ¡‰½‘ä¤°(€ô¤ì(€É•ÍÁ½¹Í”¹•¹¡‰½‘ä¤ì)ô()™Õ¹Ñ¥½¸Í•¹‘Q•áÐ¡É•ÍÁ½¹Í”°ÍÑ…ÑÕÌ°Ù…±Õ”¤ì(€É•ÍÁ½¹Í”¹ÝÉ¥Ñ•!•…¡ÍÑ…ÑÕÌ°ì(€€€€¸¸¹Í•ÕÉ¥Ñå!•…‘•ÉÌ°(€€€€‰½¹Ñ•¹ÐµQåÁ”ˆè€‰Ñ•áÐ½Á±…¥¸ì¡…ÉÍ•ÐõÕÑ˜´àˆ°(€ô¤ì(€É•ÍÁ½¹Í”¹•¹¡Ù…±Õ”¤ì)ô

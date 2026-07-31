@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   accountDataSection,
+  compactAccountData,
   formatBytes,
+  hydrateAccountData,
   normalizeUsername,
   pagination,
   summarizeData,
@@ -37,3 +39,12 @@ test("usernames and byte labels are normalized", () => {
   assert.equal(formatBytes(1024), "1.00 KB");
 });
 
+test("compact records restore inherited task fields", () => {
+  const source = {
+    tasks: [{ id: "a", title: "مهمة", description: "", time: "08:00", endTime: "09:00", requiredOverdue: false, importance: 6 }],
+    instances: { one: { id: "one", taskId: "a", title: "مهمة", description: "", time: "08:00", endTime: "09:00", requiredOverdue: false, importance: 6, date: "2026-07-31" } },
+  };
+  const compact = compactAccountData(source);
+  assert.equal(compact.instances.one.title, undefined);
+  assert.equal(hydrateAccountData(compact).instances.one.title, "مهمة");
+});

@@ -165,6 +165,7 @@
           </div>
           <div class="detail-tabs" role="tablist">
             <button class="active" data-detail-tab="summary" type="button">الملخص والتحكم</button>
+            <button data-detail-tab="timeline" type="button">السنوات والشهور</button>
             <button data-detail-tab="tasks" type="button">المهام المحفوظة</button>
             <button data-detail-tab="records" type="button">سجل التنفيذ</button>
             <button data-detail-tab="raw" type="button">البيانات النصية</button>
@@ -191,6 +192,17 @@
                 <tbody id="tablesTable"></tbody>
               </table>
             </div>
+          </section>
+          <section class="data-section database-users">
+            <div class="section-heading">
+              <div><p>اضغط على أي حساب لفتح صفحة التحكم الكاملة</p><h2>المستخدمون داخل قاعدة البيانات</h2></div>
+              <span id="databaseAccountCount"></span>
+            </div>
+            <label class="search-field">
+              <i data-lucide="search"></i>
+              <input id="databaseAccountSearch" type="search" placeholder="ابحث في مستخدمي قاعدة البيانات" />
+            </label>
+            <div class="database-user-list" id="databaseUsersList"></div>
           </section>
         </section>
 

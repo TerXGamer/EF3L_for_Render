@@ -13,6 +13,7 @@ await writeFile("app.js.br.b64", compressed.toString("base64"));
 const selectedIcons = {
   "arrow-left-right": icons.ArrowLeftRight,
   "badge-alert": icons.BadgeAlert,
+  "chart-no-axes-column-increasing": icons.ChartNoAxesColumnIncreasing,
   "circle-check": icons.CircleCheck,
   "circle-x": icons.CircleX,
   "key-round": icons.KeyRound,
@@ -29,6 +30,8 @@ const selectedIcons = {
   "shield-check": icons.ShieldCheck,
   "trash-2": icons.Trash2,
   "user-round": icons.UserRound,
+  "ellipsis-vertical": icons.EllipsisVertical,
+  x: icons.X,
 };
 
 const iconRuntime = `(() => {

@@ -905,7 +905,7 @@ async function serveStatic(request, response, pathname) {
     ...securityHeaders,
     "Content-Type": contentType(path.extname(filePath)),
     "Content-Length": info.size,
-    "Cache-Control": requested === "/index.html" ? "no-cache" : "public, max-age=3600",
+    "Cache-Control": "no-cache",
   });
   if (request.method === "HEAD") return response.end();
   createReadStream(filePath).pipe(response);

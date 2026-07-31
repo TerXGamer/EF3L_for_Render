@@ -7,7 +7,7 @@
     <meta name="description" content="افعل - مدير مهام يومي عربي واضح وفعّال." />
     <title>افعل | مهامك بوضوح</title>
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260703-1" />
+    <link rel="stylesheet" href="styles.css?v=20260801-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -74,7 +74,7 @@
 
         <section class="view active" id="view-main" aria-labelledby="viewTitle">
           <div class="summary-grid main-summary" id="mainSummary"></div>
-          <div class="section-head">
+          <div class="section-head active-section-head">
             <div>
               <p class="section-kicker">الآن</p>
               <h3>جاهزة للتنفيذ</h3>
@@ -82,7 +82,7 @@
             <span id="activeCount"></span>
           </div>
           <div class="task-list" id="activeTasks"></div>
-          <div class="section-head">
+          <div class="section-head upcoming-section-head">
             <div>
               <p class="section-kicker">لاحقًا</p>
               <h3>قادمة اليوم</h3>
@@ -421,6 +421,29 @@
             <button class="subnav-button admin-only" data-view="admin" type="button" hidden>الإدارة</button>
           </div>
           <section class="plain-panel">
+            <div class="interface-style-section">
+              <div class="section-head"><h3>تصميم الواجهة</h3><span></span></div>
+              <div class="layout-choice-grid" id="layoutChoices" role="group" aria-label="تصميم الواجهة">
+                <button class="layout-option" data-layout-value="focus" type="button" aria-pressed="true">
+                  <span class="layout-option-copy">
+                    <i data-lucide="layout-dashboard" aria-hidden="true"></i>
+                    <span><strong>الجديد</strong><small>واجهة التركيز</small></span>
+                  </span>
+                  <span class="layout-preview layout-preview-focus" aria-hidden="true">
+                    <i></i><i></i><i></i><i></i>
+                  </span>
+                </button>
+                <button class="layout-option" data-layout-value="classic" type="button" aria-pressed="false">
+                  <span class="layout-option-copy">
+                    <i data-lucide="list-checks" aria-hidden="true"></i>
+                    <span><strong>الكلاسيكي</strong><small>التصميم السابق</small></span>
+                  </span>
+                  <span class="layout-preview layout-preview-classic" aria-hidden="true">
+                    <i></i><i></i><i></i><i></i>
+                  </span>
+                </button>
+              </div>
+            </div>
             <div class="section-head"><h3>المظهر</h3><span></span></div>
             <div class="theme-grid" id="themeChoices" role="group" aria-label="ألوان الموقع">
               <button class="theme-option" data-theme-value="light" type="button" aria-pressed="true">
@@ -711,6 +734,6 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="lucide.js"></script>
-    <script type="module" src="app.js?v=20260730-2"></script>
+    <script type="module" src="app.js?v=20260801-1"></script>
   </body>
 </html>

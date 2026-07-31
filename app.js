@@ -146,6 +146,7 @@ let adminRevealTarget = "";
 let adminRevealData = null;
 let adminRevealLoading = false;
 let themeCustomizerOpen = false;
+let justCreatedTaskId = "";
 
 const el = {
   mobileUserBadge: document.getElementById("mobileUserBadge"),
@@ -183,6 +184,9 @@ const el = {
   activeCount: document.getElementById("activeCount"),
   upcomingCount: document.getElementById("upcomingCount"),
   taskForm: document.getElementById("taskForm"),
+  taskSheetTitle: document.getElementById("taskSheetTitle"),
+  closeTaskSheet: document.getElementById("closeTaskSheet"),
+  taskSheetBackdrop: document.getElementById("taskSheetBackdrop"),
   taskId: document.getElementById("taskId"),
   taskTitle: document.getElementById("taskTitle"),
   taskDescription: document.getElementById("taskDescription"),
@@ -556,6 +560,8 @@ function bindEvents() {
 
   on(el.taskForm, "submit", saveTaskFromForm);
   on(el.resetTaskForm, "click", clearTaskForm);
+  on(el.closeTaskSheet, "click", () => closeTaskSheet());
+  on(el.taskSheetBackdrop, "click", () => closeTaskSheet());
   on(el.taskRecurrence, "change", syncIntervalState);
 
   on(el.importanceButtons, "click", (event) => {
@@ -620,6 +626,11 @@ function bindEvents() {
 
   document.addEventListener("click", handleActionClick);
   document.addEventListener("change", handleSelectionChange);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.body.classList.contains("task-sheet-open")) {
+      closeTaskSheet();
+    }
+  });
 }
 
 function initialState() {
@@ -813,9 +824,15 @@ function switchView(view) {
     toast("هذه الصفحة للمدير فقط");
     return;
   }
+  if (document.body.classList.contains("task-sheet-open")) closeTaskSheet(false);
   currentView = viewRedirects[view] || view;
+  const hasDirectNavigation = usesFocusInterface() && Boolean(
+    document.querySelector(`.focus-direct-nav[data-view="${currentView}"]`),
+  );
   document.querySelectorAll(".nav-button").forEach((button) => {
-    const active = button.dataset.view === navParents[currentView];
+    const active = button.classList.contains("focus-direct-nav")
+      ? button.dataset.view === currentView
+      : !hasDirectNavigation && button.dataset.view === navParents[currentView];
     button.classList.toggle("active", active);
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
@@ -849,6 +866,23 @@ function hideLogin() {
   el.loginDialog.hidden = true;
   el.loginDialog.setAttribute("aria-hidden", "true");
   document.body.classList.remove("auth-required");
+}
+
+function usesFocusInterface() {
+  return state.settings.interfaceStyle === "focus";
+}
+
+function openTaskSheet(mode = "new") {
+  if (!usesFocusInterface()) return false;
+  if (el.taskSheetTitle) el.taskSheetTitle.textContent = mode === "edit" ? "تعديل المهمة" : "مهمة جديدة";
+  document.body.classList.add("task-sheet-open");
+  requestAnimationFrame(() => el.taskTitle.focus());
+  return true;
+}
+
+function closeTaskSheet(clear = true) {
+  document.body.classList.remove("task-sheet-open");
+  if (clear) clearTaskForm();
 }
 
 function setLoginMode(mode) {
@@ -1710,11 +1744,20 @@ function saveTaskFromForm(event) {
     state.tasks = state.tasks.map((item) => (item.id === existing.id ? task : item));
   } else {
     state.tasks.push(task);
+    justCreatedTaskId = task.id;
   }
   saveState();
+  closeTaskSheet(false);
   clearTaskForm();
   refreshSchedule();
   render();
+  if (justCreatedTaskId) {
+    const createdId = justCreatedTaskId;
+    setTimeout(() => {
+      document.querySelectorAll(`[data-task-id="${createdId}"]`).forEach((card) => card.classList.remove("is-new"));
+      if (justCreatedTaskId === createdId) justCreatedTaskId = "";
+    }, 700);
+  }
   toast("تم حفظ المهمة");
 }
 
@@ -1738,7 +1781,7 @@ function clearTaskForm() {
 function fillTaskForm(id) {
   const task = getTask(id);
   if (!task) return;
-  switchView("settings");
+  if (!usesFocusInterface()) switchView("settings");
   el.taskId.value = task.id;
   el.taskTitle.value = task.title;
   el.taskDescription.value = task.description;
@@ -1753,7 +1796,7 @@ function fillTaskForm(id) {
   selectedImportance = task.importance;
   renderImportanceButtons();
   syncIntervalState();
-  el.taskTitle.focus();
+  if (!openTaskSheet("edit")) el.taskTitle.focus();
 }
 
 function deleteTask(id) {
@@ -2122,8 +2165,15 @@ function handleActionClick(event) {
   const action = button.dataset.action;
   if (action === "new-task") {
     clearTaskForm();
-    switchView("settings");
-    el.taskTitle.focus();
+    if (!openTaskSheet("new")) {
+      switchView("settings");
+      el.taskTitle.focus();
+    }
+  }
+  if (action === "toggle-task-actions") {
+    const card = button.closest(".task-card");
+    if (card) card.classList.toggle("actions-open");
+    return;
   }
   if (action === "complete") completeInstance(id);
   if (action === "cancel-never") moveInstance(id, "never", "إلغاء: لم تنفذ");
@@ -2226,12 +2276,31 @@ function renderMain() {
   const upcoming = allMain.filter(isInstanceUpcoming);
   const required = getInstancesByStatus("requiredOverdue").length;
   const completedToday = getInstancesByStatus("completed").filter((item) => item.date === todayISO()).length;
+  const plannedToday = active.length + upcoming.length + completedToday;
+  const progress = plannedToday ? Math.round((completedToday / plannedToday) * 100) : 0;
+  const nextTask = active[0] || upcoming[0];
 
   el.mainSummary.innerHTML = [
-    metric(active.length, "جاهزة الآن"),
-    metric(upcoming.length, "قادمة اليوم"),
-    metric(required, "واجبة لم تتم"),
-    metric(completedToday, "تمت اليوم"),
+    `<section class="focus-day-overview">
+      <div class="day-progress-ring" style="--day-progress: ${progress * 3.6}deg"><strong>${progress}%</strong><span>اليوم</span></div>
+      <div class="day-overview-copy">
+        <span class="day-overview-label">تقدمك اليوم</span>
+        <h3>${nextTask ? escapeHtml(nextTask.title) : completedToday ? "أنجزت مهام اليوم" : "يومك جاهز"}</h3>
+        <p>${nextTask ? "المهمة التالية" : "لا توجد مهمة جاهزة الآن"}</p>
+      </div>
+      <div class="day-overview-stats">
+        <span><strong>${active.length}</strong> الآن</span>
+        <span><strong>${upcoming.length}</strong> لاحقًا</span>
+        <span><strong>${completedToday}</strong> منجزة</span>
+        <span><strong>${required}</strong> واجبة</span>
+      </div>
+    </section>`,
+    `<div class="classic-summary">
+      ${metric(active.length, "جاهزة الآن")}
+      ${metric(upcoming.length, "قادمة اليوم")}
+      ${metric(required, "واجبة لم تتم")}
+      ${metric(completedToday, "تمت اليوم")}
+    </div>`,
   ].join("");
 
   el.activeCount.textContent = `${active.length} مهمة`;
@@ -2248,9 +2317,29 @@ function renderMain() {
       </div>
     `;
   } else {
-    renderTaskList(el.activeTasks, active, "main");
+    if (usesFocusInterface()) renderFocusTodayGroups(el.activeTasks, active);
+    else renderTaskList(el.activeTasks, active, "main");
   }
   renderTaskList(el.upcomingTasks, upcoming, "upcoming");
+}
+
+function renderFocusTodayGroups(container, items) {
+  if (!items.length) {
+    container.innerHTML = emptyState("لا توجد مهام جاهزة الآن");
+    return;
+  }
+  const groups = [
+    ["الأولوية", items.filter((item) => Number(item.importance || 0) >= 8)],
+    ["بقية اليوم", items.filter((item) => Number(item.importance || 0) < 8)],
+  ].filter(([, groupItems]) => groupItems.length);
+  container.innerHTML = groups.map(([label, groupItems]) => `
+    <section class="focus-task-group">
+      <div class="focus-task-group-head"><strong>${label}</strong><span>${groupItems.length}</span></div>
+      <div class="focus-task-group-list">
+        ${groupItems.map((item) => taskInstanceCard(item, "main")).join("")}
+      </div>
+    </section>
+  `).join("");
 }
 
 function renderSettings() {
@@ -2628,7 +2717,8 @@ function taskInstanceCard(instance, type) {
       : "";
 
   return `
-    <article class="task-card" data-importance="${importance}">
+    <article class="task-card ${["main", "upcoming"].includes(type) ? "has-quick-check" : ""} ${instance.taskId === justCreatedTaskId ? "is-new" : ""}" data-importance="${importance}" data-task-id="${instance.taskId}">
+      ${["main", "upcoming"].includes(type) ? `<button class="focus-task-check" data-action="complete" data-id="${instance.id}" type="button" aria-label="إتمام ${escapeHtml(instance.title)}" title="تم"><i data-lucide="circle-check" aria-hidden="true"></i></button>` : ""}
       <div class="task-main">
         <div class="task-title-row">
           <h4>${escapeHtml(instance.title)}</h4>
@@ -2646,6 +2736,7 @@ function taskInstanceCard(instance, type) {
         </div>
         ${checkbox}
       </div>
+      <button class="focus-task-menu" data-action="toggle-task-actions" type="button" aria-label="إجراءات المهمة" title="إجراءات المهمة"><i data-lucide="ellipsis-vertical" aria-hidden="true"></i></button>
       <div class="task-actions">
         ${instanceActions(instance, type)}
       </div>
@@ -2676,6 +2767,7 @@ function taskSettingCard(task) {
           ${task.requiredOverdue ? `<span class="pill amber">ينتقل للواجبة</span>` : `<span class="pill">غير واجبة عند الانتهاء</span>`}
         </div>
       </div>
+      <button class="focus-task-menu" data-action="toggle-task-actions" type="button" aria-label="إجراءات المهمة" title="إجراءات المهمة"><i data-lucide="ellipsis-vertical" aria-hidden="true"></i></button>
       <div class="task-actions">
         ${actionButton("ghost-button", "edit-task", task.id, "pencil", "تعديل")}
         ${actionButton("danger-button", "delete-task", task.id, "trash-2", "حذف")}
@@ -2733,7 +2825,7 @@ function instanceActions(instance, type) {
 }
 
 function actionButton(className, action, id, iconName, label) {
-  return `<button class="${className}" data-action="${action}" data-id="${id}" type="button">
+  return `<button class="${className}" data-action="${action}" data-id="${id}" type="button" aria-label="${label}" title="${label}">
     <i data-lucide="${iconName}" aria-hidden="true"></i>
     <span>${label}</span>
   </button>`;

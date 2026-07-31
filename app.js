@@ -1494,6 +1494,20 @@ function refreshSchedule() {
   const now = new Date();
   const taskIds = new Set(state.tasks.map((task) => task.id));
 
+  Object.keys(state.instances).forEach((id) => {
+    const instance = state.instances[id];
+    if (instance?.date !== today || instance.status !== "main" || instance.source !== "schedule") return;
+    const task = getTask(instance.taskId);
+    const eligible =
+      task?.active &&
+      isTaskDueOn(task, today) &&
+      (!task.dependencyId || isDependencyCompleted(task.dependencyId, today));
+    if (eligible) return;
+    state.meta.instanceTombstones[id] = now.toISOString();
+    delete state.instances[id];
+    changed = true;
+  });
+
   state.tasks.forEach((task) => {
     if (!task.active) return;
     const start = maxDate(task.startDate, addDays(today, -SCHEDULE_LOOKBACK_DAYS));

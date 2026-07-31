@@ -32,7 +32,9 @@ const el = Object.fromEntries(
     "accountDetailContent", "databaseDisplayName", "sourceAppLink", "databaseFacts",
     "tablesTable", "databaseAccountCount", "databaseAccountSearch", "databaseUsersList",
     "auditList", "auditCount", "auditPrev", "auditNext", "auditPage",
-    "passwordDialog", "passwordForm", "newAccountPassword", "confirmPasswordReset", "toast",
+    "passwordDialog", "passwordForm", "newAccountPassword", "confirmPasswordReset",
+    "toggleAccountPassword", "generateAccountPassword", "copyAccountPassword",
+    "passwordRevealNote", "toast",
   ].map((id) => [id, document.getElementById(id)]),
 );
 
@@ -102,6 +104,9 @@ function bindEvents() {
   el.accountDetailContent.addEventListener("input", handleItemFilter);
   el.accountDetailContent.addEventListener("change", handleItemFilter);
   el.passwordForm.addEventListener("submit", handlePasswordDialog);
+  el.toggleAccountPassword.addEventListener("click", togglePasswordVisibility);
+  el.generateAccountPassword.addEventListener("click", generateAccountPassword);
+  el.copyAccountPassword.addEventListener("click", copyAccountPassword);
 }
 
 async function handleLogin(event) {
@@ -543,6 +548,8 @@ async function handleDetailClick(event) {
   const action = button.dataset.action;
   if (action === "reset-password") {
     el.newAccountPassword.value = "";
+    el.newAccountPassword.type = "password";
+    el.passwordRevealNote.textContent = "لا يمكن كشف كلمة المرور الحالية لأنها مشفرة. يمكنك تعيين كلمة جديدة وكشفها قبل الحفظ.";
     el.passwordDialog.showModal();
   }
   if (action === "revoke-sessions" && confirm(`تسجيل خروج ${username} من جميع الأجهزة؟`)) {
@@ -631,6 +638,34 @@ async function handlePasswordDialog(event) {
   el.passwordDialog.close();
   toast("تم تغيير كلمة المرور وإغلاق الجلسات");
   await openAccount(state.account.account.username);
+}
+
+function togglePasswordVisibility() {
+  const reveal = el.newAccountPassword.type === "password";
+  el.newAccountPassword.type = reveal ? "text" : "password";
+  el.toggleAccountPassword.innerHTML = `<i data-lucide="${reveal ? "eye-off" : "eye"}"></i>`;
+  el.toggleAccountPassword.title = reveal ? "إخفاء كلمة المرور" : "كشف كلمة المرور";
+  el.toggleAccountPassword.setAttribute("aria-label", el.toggleAccountPassword.title);
+  refreshIcons();
+}
+
+function generateAccountPassword() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  const values = crypto.getRandomValues(new Uint32Array(22));
+  el.newAccountPassword.value = Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
+  el.newAccountPassword.type = "text";
+  el.toggleAccountPassword.innerHTML = '<i data-lucide="eye-off"></i>';
+  el.toggleAccountPassword.title = "إخفاء كلمة المرور";
+  el.toggleAccountPassword.setAttribute("aria-label", "إخفاء كلمة المرور");
+  el.passwordRevealNote.textContent = "تم توليد كلمة مرور قوية. انسخها قبل حفظها لأنها لن تظهر مجددًا.";
+  refreshIcons();
+  el.newAccountPassword.focus();
+}
+
+async function copyAccountPassword() {
+  if (!el.newAccountPassword.value) return toast("ولّد أو اكتب كلمة المرور أولًا");
+  await navigator.clipboard.writeText(el.newAccountPassword.value);
+  toast("تم نسخ كلمة المرور");
 }
 
 function renderDatabase() {

@@ -7,7 +7,7 @@
     <meta name="description" content="لوحة التحكم الآمنة لموقع افعل" />
     <title>تحكم افعل</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/styles.css?v=2" />
+    <link rel="stylesheet" href="/styles.css?v=3" />
   </head>
   <body>
     <section class="login-screen" id="loginScreen">
@@ -229,9 +229,18 @@
         </div>
         <label class="field">
           <span>كلمة المرور الجديدة</span>
-          <input id="newAccountPassword" type="password" minlength="8" maxlength="128" required />
+          <span class="password-input">
+            <input id="newAccountPassword" type="password" minlength="8" maxlength="128" required />
+            <button class="icon-button" id="toggleAccountPassword" type="button" title="كشف كلمة المرور" aria-label="كشف كلمة المرور">
+              <i data-lucide="eye"></i>
+            </button>
+          </span>
         </label>
-        <p>سيتم تسجيل خروج الحساب من جميع أجهزته بعد التغيير.</p>
+        <div class="password-tools">
+          <button class="ghost" id="generateAccountPassword" type="button"><i data-lucide="wand-2"></i><span>توليد كلمة مرور قوية</span></button>
+          <button class="ghost" id="copyAccountPassword" type="button"><i data-lucide="copy"></i><span>نسخ</span></button>
+        </div>
+        <p id="passwordRevealNote">لا يمكن كشف كلمة المرور الحالية لأنها مشفرة. يمكنك تعيين كلمة جديدة وكشفها قبل الحفظ.</p>
         <div class="dialog-actions">
           <button class="ghost" value="cancel" type="submit" formnovalidate>إلغاء</button>
           <button class="primary" id="confirmPasswordReset" value="default" type="submit">حفظ وتأمين الحساب</button>
@@ -240,7 +249,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="/lucide.js?v=2"></script>
-    <script type="module" src="/app.js?v=2"></script>
+    <script src="/lucide.js?v=3"></script>
+    <script type="module" src="/app.js?v=3"></script>
   </body>
 </html>

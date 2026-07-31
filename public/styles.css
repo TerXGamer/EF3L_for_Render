@@ -71,6 +71,9 @@ svg { flex: 0 0 auto; }
   color: var(--text);
   background: var(--field);
 }
+.password-input { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 7px; }
+.password-input .icon-button { width: 44px; height: 44px; }
+.password-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .field input:focus, .search-field input:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(20, 122, 90, 0.13);

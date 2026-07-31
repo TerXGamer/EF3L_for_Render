@@ -135,6 +135,9 @@ async function handleApi(request, response, url) {
   if (parts[3] === "sessions" && request.method === "DELETE") {
     return revokeSessions(response, session, username);
   }
+  if (parts[3] === "tasks" && parts[4] === "import" && request.method === "POST") {
+    return importAccountTasks(request, response, session, username);
+  }
   if (parts[3] === "items" && parts[4] && request.method === "DELETE") {
     return deleteAccountItem(response, session, username, decodeURIComponent(parts[4]), url);
   }
@@ -484,7 +487,7 @@ async function resetPassword(request, response, session, username) {
   );
   if (!result.rowCount) return sendJson(response, 404, { error: "الحساب غير موجود" });
   await getPool().query("DELETE FROM account_sessions WHERE username = $1", [username]);
-  await logAudit(session.sub, "reset_password", username, { sessionsRevoked: true });
+  await logAudit(session.sub, "reset_password", usernam…2 tokens truncated…ssionsRevoked: true });
   return sendJson(response, 200, { ok: true });
 }
 
@@ -492,6 +495,98 @@ async function revokeSessions(response, session, username) {
   const result = await getPool().query("DELETE FROM account_sessions WHERE username = $1", [username]);
   await logAudit(session.sub, "revoke_sessions", username, { count: result.rowCount });
   return sendJson(response, 200, { ok: true, count: result.rowCount });
+}
+
+async function importAccountTasks(request, response, session, username) {
+  const body = await readJson(request);
+  if (!Array.isArray(body.tasks) || !body.tasks.length || body.tasks.length > 500) {
+    return sendJson(response, 400, { error: "قائمة المهام غير صالحة" });
+  }
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query("SELECT data FROM accounts WHERE username = $1 FOR UPDATE", [username]);
+    if (!result.rowCount) {
+      await client.query("ROLLBACK");
+      return sendJson(response, 404, { error: "الحساب غير موجود" });
+    }
+    const data = hydrateAccountData(result.rows[0].data);
+    const existing = Array.isArray(data.tasks) ? data.tasks : [];
+    const existingTitles = new Set(existing.map((task) => normalizedTitle(task?.title)));
+    const now = new Date().toISOString();
+    const imported = body.tasks.map((task, index) => normalizeImportedTask(task, index, now)).filter(Boolean);
+    const additions = imported.filter((task) => {
+      const title = normalizedTitle(task.title);
+      if (!title || existingTitles.has(title)) return false;
+      existingTitles.add(title);
+      return true;
+    });
+    const validIds = new Set([...existing, ...additions].map((task) => String(task.id || "")));
+    additions.forEach((task) => {
+      if (!validIds.has(task.dependencyId) || task.dependencyId === task.id) task.dependencyId = "";
+    });
+    data.tasks = [...existing, ...additions];
+    data.meta = data.meta && typeof data.meta === "object" ? data.meta : {};
+    data.meta.taskTombstones = { ...(data.meta.taskTombstones || {}) };
+    additions.forEach((task) => delete data.meta.taskTombstones[task.id]);
+    const summary = summarizeData(data);
+    const compact = compactAccountData(data);
+    await client.query(
+      `UPDATE accounts SET data = $2::jsonb, summary = $3::jsonb, updated_at = NOW() WHERE username = $1`,
+      [username, JSON.stringify(compact), JSON.stringify(summary)],
+    );
+    await client.query("COMMIT");
+    await logAudit(session.sub, "import_tasks", username, {
+      requested: body.tasks.length,
+      added: additions.length,
+      skipped: body.tasks.length - additions.length,
+    });
+    return sendJson(response, 200, {
+      ok: true,
+      added: additions.length,
+      skipped: body.tasks.length - additions.length,
+      total: data.tasks.length,
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function normalizeImportedTask(value, index, now) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const title = String(value.title || "").trim().slice(0, 80);
+  if (!title) return null;
+  const requestedId = String(value.id || "");
+  const id = /^[a-zA-Z0-9._:-]{1,240}$/.test(requestedId)
+    ? requestedId
+    : `task:admin-import:${Date.now().toString(36)}:${index}`;
+  const recurrence = ["once", "daily", "weekly", "monthly", "custom"].includes(value.recurrence)
+    ? value.recurrence
+    : "daily";
+  const importance = [2, 4, 6, 8, 10].includes(Number(value.importance)) ? Number(value.importance) : 6;
+  return {
+    id,
+    title,
+    description: String(value.description || "").trim().slice(0, 260),
+    startDate: /^\d{4}-\d{2}-\d{2}$/.test(String(value.startDate || "")) ? value.startDate : localDate(),
+    recurrence,
+    intervalDays: Math.min(365, Math.max(1, Number(value.intervalDays) || 1)),
+    dependencyId: /^[a-zA-Z0-9._:-]{1,240}$/.test(String(value.dependencyId || "")) ? String(value.dependencyId) : "",
+    time: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value.time || "")) ? value.time : "00:00",
+    endTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value.endTime || "")) ? value.endTime : "23:59",
+    requiredOverdue: Boolean(value.requiredOverdue),
+    importance,
+    active: value.active !== false,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function normalizedTitle(value) {
+  return String(value || "").trim().toLocaleLowerCase("ar-SA");
 }
 
 async function deleteAccountItem(response, session, username, itemId, url) {

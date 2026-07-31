@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   addDays,
   calculateStats,
+  compactAccountData,
   daysBetween,
+  hydrateAccountData,
   isTaskDueOn,
   latestDueDateOnOrBefore,
   mapTimeIntoWindow,
@@ -64,4 +66,36 @@ test("dependency validation blocks direct and indirect cycles", () => {
   ];
   assert.equal(wouldCreateDependencyCycle(tasks, "a", "c"), true);
   assert.equal(wouldCreateDependencyCycle(tasks, "c", "a"), false);
+});
+
+test("cloud storage deduplicates instance text without losing history", () => {
+  const data = {
+    tasks: [{
+      id: "task-a",
+      title: "قراءة",
+      description: "ثلاثون دقيقة",
+      time: "08:00",
+      endTime: "09:00",
+      requiredOverdue: true,
+      importance: 8,
+    }],
+    instances: {
+      "task-a:2026-07-30": {
+        id: "task-a:2026-07-30",
+        taskId: "task-a",
+        title: "قراءة",
+        description: "ثلاثون دقيقة",
+        date: "2026-07-30",
+        time: "08:00",
+        endTime: "09:00",
+        requiredOverdue: true,
+        importance: 8,
+        status: "completed",
+      },
+    },
+  };
+  const compact = compactAccountData(data);
+  assert.equal(compact.instances["task-a:2026-07-30"].title, undefined);
+  assert.ok(JSON.stringify(compact).length < JSON.stringify(data).length);
+  assert.deepEqual(hydrateAccountData(compact).instances["task-a:2026-07-30"], data.instances["task-a:2026-07-30"]);
 });

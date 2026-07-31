@@ -6,6 +6,101 @@ const VALID_STATUSES = new Set([
   "never",
   "completed",
 ]);
+const INSTANCE_PROFILE_FIELDS = [
+  "title",
+  "description",
+  "time",
+  "endTime",
+  "requiredOverdue",
+  "importance",
+];
+
+export function hydrateAccountData(value) {
+  const data =
+    value && typeof value === "object" && !Array.isArray(value) ? structuredClone(value) : {};
+  const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+  const taskById = new Map(tasks.map((task) => [String(task?.id || ""), task]));
+  const profiles = Array.isArray(data.instanceProfiles) ? data.instanceProfiles : [];
+  const source =
+    data.instances && typeof data.instances === "object" && !Array.isArray(data.instances)
+      ? data.instances
+      : {};
+
+  data.instances = Object.fromEntries(
+    Object.entries(source).map(([key, value]) => {
+      const item = value && typeof value === "object" ? value : {};
+      const task = taskById.get(String(item.taskId || "")) || {};
+      const profile = Number.isInteger(item.profile) ? profiles[item.profile] : null;
+      const hydrated = { ...item, id: item.id || key };
+      INSTANCE_PROFILE_FIELDS.forEach((field, index) => {
+        if (hydrated[field] !== undefined) return;
+        if (Array.isArray(profile) && profile[index] !== undefined && profile[index] !== null) {
+          hydrated[field] = profile[index];
+        } else if (task[field] !== undefined) {
+          hydrated[field] = task[field];
+        }
+      });
+      delete hydrated.profile;
+      return [key, hydrated];
+    }),
+  );
+  delete data.instanceProfiles;
+  return data;
+}
+
+export function compactAccountData(value) {
+  const data = hydrateAccountData(value);
+  const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+  const taskById = new Map(tasks.map((task) => [String(task?.id || ""), task]));
+  const profileIndexes = new Map();
+  const profiles = [];
+
+  data.instances = Object.fromEntries(
+    Object.entries(data.instances || {}).map(([key, value]) => {
+      const item = { ...(value || {}), id: value?.id || key };
+      const task = taskById.get(String(item.taskId || ""));
+      const profile = INSTANCE_PROFILE_FIELDS.map((field) => item[field] ?? null);
+      const differsFromTask =
+        !task || INSTANCE_PROFILE_FIELDS.some((field) => (item[field] ?? null) !== (task[field] ?? null));
+      INSTANCE_PROFILE_FIELDS.forEach((field) => delete item[field]);
+      if (differsFromTask) {
+        const profileKey = JSON.stringify(profile);
+        if (!profileIndexes.has(profileKey)) {
+          profileIndexes.set(profileKey, profiles.length);
+          profiles.push(profile);
+        }
+        item.profile = profileIndexes.get(profileKey);
+      }
+      if (!Array.isArray(item.history) || !item.history.length) delete item.history;
+      return [key, removeUndefined(item)];
+    }),
+  );
+
+  if (profiles.length) data.instanceProfiles = profiles;
+  else delete data.instanceProfiles;
+  delete data.imports;
+  delete data.sync;
+
+  if (data.settings && typeof data.settings === "object") {
+    const customizations = data.settings.themeCustomizations;
+    if (customizations && typeof customizations === "object") {
+      data.settings.themeCustomizations = Object.fromEntries(
+        Object.entries(customizations).filter(([, entry]) => entry?.mode === "custom"),
+      );
+    }
+    for (const key of ["statsExcludedInstanceIds", "hiddenListInstanceIds", "snapshots"]) {
+      if (Array.isArray(data.settings[key]) && !data.settings[key].length) delete data.settings[key];
+    }
+  }
+
+  return removeUndefined(data);
+}
+
+function removeUndefined(value) {
+  return Object.fromEntries(
+    Object.entries(value || {}).filter(([, item]) => item !== undefined),
+  );
+}
 
 function dateParts(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));

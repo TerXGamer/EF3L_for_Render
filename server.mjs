@@ -421,4 +421,760 @@ async function handleAdminRequest(request, response) {
       try {
         await client.query("BEGIN");
         await client.query(
-          `UPDATE accoußÍ7¶‰žËkºwµçt°(€€¤ì(€É•ÑÕÉ¸ÉÉ…ä¹™É½´¡µ…À¹Ù…±Õ•Ì ¤¤ì)ô()™Õ¹Ñ¥½¸µ•É•Q¥µ•ÍÑ…µÁ5…ÁÌ¡™¥ÉÍÐ°Í•½¹¤ì(€½¹ÍÐµ•É•€ôì€¸¸¸¡™¥ÉÍÐñðíô¤ôì(€=‰©•Ð¹•¹ÑÉ¥•Ì¡Í•½¹ñðíô¤¹™½É…  ¡m¥°Ù…±Õ•t¤€ôøì(€€€µ•É•‘m¥‘t€ô±…Ñ•ÍÑQ¥µ•ÍÑ…µÀ¡µ•É•‘m¥‘t°Ù…±Õ”¤ì(€ô¤ì(€É•ÑÕÉ¸µ•É•ì)ô()™Õ¹Ñ¥½¸±…Ñ•ÍÑQ¥µ•ÍÑ…µÀ¡™¥ÉÍÐ°Í•½¹¤ì(€¥˜€ …™¥ÉÍÐ¤É•ÑÕÉ¸Í•½¹ñð¹Õ±°ì(€¥˜€ …Í•½¹¤É•ÑÕÉ¸™¥ÉÍÐì(€É•ÑÕÉ¸¹•Ü…Ñ”¡™¥ÉÍÐ¤¹•ÑQ¥µ” ¤€øô¹•Ü…Ñ”¡Í•½¹¤¹•ÑQ¥µ” ¤€ü™¥ÉÍÐ€èÍ•½¹ì)ô()™Õ¹Ñ¥½¸¥Í™Ñ•ÉQ½µ‰ÍÑ½¹”¡ÕÁ‘…Ñ•‘Ð°‘•±•Ñ•‘Ð¤ì(€¥˜€ …‘•±•Ñ•‘Ð¤É•ÑÕÉ¸ÑÉÕ”ì(€É•ÑÕÉ¸¹•Ü…Ñ”¡ÕÁ‘…Ñ•‘Ðñð€À¤¹•ÑQ¥µ” ¤€ø¹•Ü…Ñ”¡‘•±•Ñ•‘Ð¤¹•ÑQ¥µ” ¤ì)ô()™Õ¹Ñ¥½¸Õ¹¥ÅÕ•MÑÉ¥¹Ì¡™¥ÉÍÐ°Í•½¹¤ì(€É•ÑÕÉ¸ÉÉ…ä¹™É½´ (€€€¹•ÜM•Ð¡l¸¸¸¡ÉÉ…ä¹¥ÍÉÉ…ä¡™¥ÉÍÐ¤€ü™¥ÉÍÐ€èmt¤°€¸¸¸¡ÉÉ…ä¹¥ÍÉÉ…ä¡Í•½¹¤€üÍ•½¹€èmt¥t¤°(€€¤¹Í±¥” ´ÔÁ|ÀÀÀ¤ì)ô()™Õ¹Ñ¥½¸Í…¹¥Ñ¥é•…Ñ„¡‘…Ñ„°ÕÍ•É¹…µ”¤ì(€¥˜€ …‘…Ñ„ñðÑåÁ•½˜‘…Ñ„€„ôô€‰½‰©•ÐˆñðÉÉ…ä¹¥ÍÉÉ…ä¡‘…Ñ„¤¤É•ÑÕÉ¸íôì(€½¹ÍÐÍ…™”€ôÍÑÉÕÑÕÉ•‘±½¹”¡‘…Ñ„¤ì(€¥˜€¡Í…™”¹ÕÍ•È€˜˜ÑåÁ•½˜Í…™”¹ÕÍ•È€ôôô€‰½‰©•Ðˆ¤ì(€€€Í…™”¹ÕÍ•È€ôì(€€€€€¹…µ”è±•…¹Q•áÐ¡Í…™”¹ÕÍ•È¹¹…µ”°€àÀ¤°(€€€€€•µ…¥°è±•…¹Q•áÐ¡Í…™”¹ÕÍ•È¹•µ…¥°°€ÄÈÀ¤°(€€€€€ÕÍ•É¹…µ”è¹½Éµ…±¥é•UÍ•É¹…µ”¡ÕÍ•É¹…µ”ñðÍ…™”¹ÕÍ•È¹ÕÍ•É¹…µ”¤°(€€€€€±½•‘%¹Ðè±•…¹Q•áÐ¡Í…™”¹ÕÍ•È¹±½•‘%¹Ð°€ÐÀ¤°(€€€ôì(€ô(€Í…™”¹Ñ…Í­Ì€ô€¡ÉÉ…ä¹¥ÍÉÉ…ä¡Í…™”¹Ñ…Í­Ì¤€üÍ…™”¹Ñ…Í­Ì€èmt¤¹Í±¥” À°€ÄÀÀÀ¤ì(€Í…™”¹¥¹ÍÑ…¹•Ì€ô=‰©•Ð¹™É½µ¹ÑÉ¥•Ì (€€€=‰©•Ð¹•¹ÑÉ¥•Ì (€€€€€Í…™”¹¥¹ÍÑ…¹•Ì€˜˜ÑåÁ•½˜Í…™”¹¥¹ÍÑ…¹•Ì€ôôô€‰½‰©•Ðˆ€˜˜€…ÉÉ…ä¹¥ÍÉÉ…ä¡Í…™”¹¥¹ÍÑ…¹•Ì¤(€€€€€€€€üÍ…™”¹¥¹ÍÑ…¹•Ì(€€€€€€€€èíô°(€€€€¤(€€€€€€¹™¥±Ñ•È ¡m¥°¥Ñ•µt¤€ôø±•…¹%¡¥¤€˜˜¥Ñ•´€˜˜ÑåÁ•½˜¥Ñ•´€ôôô€‰½‰©•Ðˆ¤(€€€€€€¹Í±¥” ´ÔÁ|ÀÀÀ¤°(€€¤ì(€Í…™”¹Í•ÑÑ¥¹Ì€ôÍ…™”¹Í•ÑÑ¥¹Ì€˜˜ÑåÁ•½˜Í…™”¹Í•ÑÑ¥¹Ì€ôôô€‰½‰©•Ðˆ€üÍ…™”¹Í•ÑÑ¥¹Ì€èíôì(€Í…™”¹Í•ÑÑ¥¹Ì¹Í¹…ÁÍ¡½ÑÌ€ô€¡ÉÉ…ä¹¥ÍÉÉ…ä¡Í…™”¹Í•ÑÑ¥¹Ì¹Í¹…ÁÍ¡½ÑÌ¤(€€€€üÍ…™”¹Í•ÑÑ¥¹Ì¹Í¹…ÁÍ¡½ÑÌ(€€€€èmt(€€¤¹Í±¥” À°€ÌÀ¤ì(€Í…™”¹µ•Ñ„€ôÍ…™”¹µ•Ñ„€˜˜ÑåÁ•½˜Í…™”¹µ•Ñ„€ôôô€‰½‰©•Ðˆ€üÍ…™”¹µ•Ñ„€èíôì(€Í…™”¹µ•Ñ„¹Ñ…Í­Q½µ‰ÍÑ½¹•Ì€ôÍ…¹¥Ñ¥é•Q¥µ•ÍÑ…µÁ5…À¡Í…™”¹µ•Ñ„¹Ñ…Í­Q½µ‰ÍÑ½¹•Ì¤ì(€Í…™”¹µ•Ñ„¹¥¹ÍÑ…¹•Q½µ‰ÍÑ½¹•Ì€ôÍ…¹¥Ñ¥é•Q¥µ•ÍÑ…µÁ5…À¡Í…™”¹µ•Ñ„¹¥¹ÍÑ…¹•Q½µ‰ÍÑ½¹•Ì¤ì(€‘•±•Ñ”Í…™”¹¥µÁ½ÉÑÌì(€É•ÑÕÉ¸Í…™”ì)ô()™Õ¹Ñ¥½¸Í…¹¥Ñ¥é•Q¥µ•ÍÑ…µÁ5…À¡Ù…±Õ”¤ì(€É•ÑÕÉ¸=‰©•Ð¹™É½µ¹ÑÉ¥•Ì (€€€=‰©•Ð¹•¹ÑÉ¥•Ì¡Ù…±Õ”€˜˜ÑåÁ•½˜Ù…±Õ”€ôôô€‰½‰©•Ðˆ€üÙ…±Õ”€èíô¤(€€€€€€¹™¥±Ñ•È (€€€€€€€€¡m¥°Ñ¥µ•ÍÑ…µÁt¤€ôø(€€€€€€€€€±•…¹%¡¥¤€˜˜9Õµ‰•È¹¥Í¥¹¥Ñ”¡¹•Ü…Ñ”¡MÑÉ¥¹œ¡Ñ¥µ•ÍÑ…µÀñð€ˆˆ¤¤¹•ÑQ¥µ” ¤¤°(€€€€€€¤(€€€€€€¹Í±¥” ´ÔÁ|ÀÀÀ¤°(€€¤ì)ô()™Õ¹Ñ¥½¸‰Õ¥±‘MÕµµ…Éä¡‘…Ñ„¤ì(€½¹ÍÐÑ…Í­Ì€ôÉÉ…ä¹¥ÍÉÉ…ä¡‘…Ñ„ü¹Ñ…Í­Ì¤€ü‘…Ñ„¹Ñ…Í­Ì€èmtì(€½¹ÍÐ¥¹ÍÑ…¹•Ì€ô(€€€‘…Ñ„ü¹¥¹ÍÑ…¹•Ì€˜˜ÑåÁ•½˜‘…Ñ„¹¥¹ÍÑ…¹•Ì€ôôô€‰½‰©•Ðˆ€ü=‰©•Ð¹Ù…±Õ•Ì¡‘…Ñ„¹¥¹ÍÑ…¹•Ì¤€èmtì(€É•ÑÕÉ¸ì(€€€Ñ…Í­M•ÑÑ¥¹Í½Õ¹ÐèÑ…Í­Ì¹±•¹Ñ °(€€€Ñ…Í­I•½É‘Í½Õ¹Ðè¥¹ÍÑ…¹•Ì¹±•¹Ñ °(€€€½µÁ±•Ñ•‘½Õ¹Ðè¥¹ÍÑ…¹•Ì¹™¥±Ñ•È ¡¥Ñ•´¤€ôø¥Ñ•´ü¹ÍÑ…ÑÕÌ€ôôô€‰½µÁ±•Ñ•ˆ¤¹±•¹Ñ °(€€€ÕÁ‘…Ñ•‘Ðè¹•Ü…Ñ” ¤¹Ñ½%M=MÑÉ¥¹œ ¤°(€ôì)ô()™Õ¹Ñ¥½¸Ù…±¥‘…Ñ•9•Ý½Õ¹Ð¡ìÕÍ•É¹…µ”°Á…ÍÍÝ½É°¹…µ”°•µ…¥°ô¤ì(€¥˜€ „½ymqÁí1õqÁí9ô¹|µuìÌ°ÔÁô½Ô¹Ñ•ÍÐ¡ÕÍ•É¹…µ”¤¤ì(€€€É•ÑÕÉ¸€‹bŸbÏfƒbŸffbÏb«b»b¿fƒf+b³b ƒbfƒf+ff#fƒff€Ìƒb—ff$€ÔÀƒb·bÇff/bœƒb¿f#fƒfbÏbŸfbŸb¨ˆì(€ô(€¥˜€¡Á…ÍÍÝ½É¹±•¹Ñ €ð€àñðÁ…ÍÍÝ½É¹±•¹Ñ €ø€ÄÈà¤ì(€€€É•ÑÕÉ¸€‹fffb¤ƒbŸffbÇf#bÄƒf+b³b ƒbfƒb«ff#fƒb£f+f€àƒf ÄÈàƒb·bÇff/bœˆì(€ô(€¥˜€ …¹…µ”¤É•ÑÕÉ¸€‹bŸfbŸbÏfƒfbßff#b ˆì(€¥˜€ …¥ÍY…±¥‘µ…¥°¡•µ…¥°¤¤É•ÑÕÉ¸€‹bŸfb£bÇf+b¼ƒbŸfb—ffb«bÇf#ff(ƒbëf+bÄƒb×bŸfb´ˆì(€É•ÑÕÉ¸€ˆˆì)ô()™Õ¹Ñ¥½¸¥ÍY…±¥‘µ…¥°¡Ù…±Õ”¤ì(€É•ÑÕÉ¸€½ymyqÍt­myqÍt­p¹myqÍt¬¼¹Ñ•ÍÐ¡±•…¹Q•áÐ¡Ù…±Õ”°€ÄÈÀ¤¤ì)ô()™Õ¹Ñ¥½¸É•ÅÕ•ÍÑÑÑ•µÁÑ-•ä¡É•ÅÕ•ÍÐ°ÕÍ•É¹…µ”¤ì(€½¹ÍÐ™½ÉÝ…É‘•€ôMÑÉ¥¹œ¡É•ÅÕ•ÍÐ¹¡•…‘•ÉÍl‰àµ™½ÉÝ…É‘•µ™½È‰tñð€ˆˆ¤¹ÍÁ±¥Ð ˆ°ˆ¥lÁt¹ÑÉ¥´ ¤ì(€É•ÑÕÉ¸€‘í™½ÉÝ…É‘•ñðÉ•ÅÕ•ÍÐ¹Í½­•Ð¹É•µ½Ñ•‘‘É•ÍÌñð€‰Õ¹­¹½Ý¸‰ôè‘íÕÍ•É¹…µ•õ€ì)ô()™Õ¹Ñ¥½¸¥ÍI…Ñ•1¥µ¥Ñ•¡­•ä¤ì(€½¹ÍÐÕÑ½™˜€ô…Ñ”¹¹½Ü ¤€´€ÄÔ€¨€ØÁ|ÀÀÀì(€½¹ÍÐ…ÑÑ•µÁÑÌ€ô€¡±½¥¹ÑÑ•µÁÑÌ¹•Ð¡­•ä¤ñðmt¤¹™¥±Ñ•È ¡Ñ¥µ”¤€ôøÑ¥µ”€øôÕÑ½™˜¤ì(€¥˜€¡…ÑÑ•µÁÑÌ¹±•¹Ñ ¤±½¥¹ÑÑ•µÁÑÌ¹Í•Ð¡­•ä°…ÑÑ•µÁÑÌ¤ì(€É•ÑÕÉ¸…ÑÑ•µÁÑÌ¹±•¹Ñ €øô€àì)ô()™Õ¹Ñ¥½¸É•½É‘…¥±•‘ÑÑ•µÁÐ¡­•ä¤ì(€½¹ÍÐ…ÑÑ•µÁÑÌ€ô±½¥¹ÑÑ•µÁÑÌ¹•Ð¡­•ä¤ñðmtì(€…ÑÑ•µÁÑÌ¹ÁÕÍ ¡…Ñ”¹¹½Ü ¤¤ì(€±½¥¹ÑÑ•µÁÑÌ¹Í•Ð¡­•ä°…ÑÑ•µÁÑÌ¹Í±¥” ´à¤¤ì)ô()™Õ¹Ñ¥½¸±•…ÉÑÑ•µÁÑÌ¡­•ä¤ì(€±½¥¹ÑÑ•µÁÑÌ¹‘•±•Ñ”¡­•ä¤ì)ô()…Íå¹Œ™Õ¹Ñ¥½¸Í•ÉÙ•MÑ…Ñ¥¥±”¡É•ÅÕ•ÍÐ°É•ÍÁ½¹Í”°Á…Ñ¡¹…µ”¤ì(€¥˜€¡É•ÅÕ•ÍÐ¹µ•Ñ¡½€„ôô€‰Pˆ€˜˜É•ÅÕ•ÍÐ¹µ•Ñ¡½€„ôô€‰!ˆ¤ì(€€€É•ÑÕÉ¸Í•¹‘Q•áÐ¡É•ÍÁ½¹Í”°€ÐÀÔ°€‰5•Ñ¡½¹½Ð…±±½Ý•ˆ°ì±±½Üè€‰P°!ˆô¤ì(€ô((€½¹ÍÐÉ•ÅÕ•ÍÑ•‘A…Ñ €ôÁ…Ñ¡¹…µ”€ôôô€ˆ¼ˆ€ü€ˆ½¥¹‘•à¹¡Ñµ°ˆ€èÁ…Ñ¡¹…µ”ì(€¥˜€ …ÁÕ‰±¥¥±•Ì¹¡…Ì¡É•ÅÕ•ÍÑ•‘A…Ñ ¤¤É•ÑÕÉ¸Í•¹‘Q•áÐ¡É•ÍÁ½¹Í”°€ÐÀÐ°€‰9½Ð™½Õ¹ˆ¤ì(€½¹ÍÐ™¥±•A…Ñ €ôÁ…Ñ ¹©½¥¸¡É½½Ñ¥È°É•ÅÕ•ÍÑ•‘A…Ñ ¹Í±¥” Ä¤¤ì(€½¹ÍÐÉ•±…Ñ¥Ù”€ôÁ…Ñ ¹É•±…Ñ¥Ù”¡É½½Ñ¥È°™¥±•A…Ñ ¤ì(€¥˜€¡É•±…Ñ¥Ù”¹ÍÑ…ÉÑÍ]¥Ñ  ˆ¸¸ˆ¤ñðÁ…Ñ ¹¥Í‰Í½±ÕÑ”¡É•±…Ñ¥Ù”¤¤ì(€€€É•ÑÕÉ¸Í•¹‘Q•áÐ¡É•ÍÁ½¹Í”°€ÐÀÌ°€‰½É‰¥‘‘•¸ˆ¤ì(€ô((€±•Ð¥¹™¼ì(€ÑÉäì(€€€¥¹™¼€ô…Ý…¥ÐÍÑ…Ð¡™¥±•A…Ñ ¤ì(€ô…Ñ ì(€€€É•ÑÕÉ¸Í•¹‘Q•áÐ¡É•ÍÁ½¹Í”°€ÐÀÐ°€‰9½Ð™½Õ¹ˆ¤ì(€ô(€¥˜€ …¥¹™¼¹¥Í¥±” ¤¤É•ÑÕÉ¸Í•¹‘Q•áÐ¡É•ÍÁ½¹Í”°€ÐÀÐ°€‰9½Ð™½Õ¹ˆ¤ì((€É•ÍÁ½¹Í”¹ÝÉ¥Ñ•!•… ÈÀÀ°ì(€€€€¸¸¹Í•ÕÉ¥Ñå!•…‘•ÉÌ°(€€€€‰½¹Ñ•¹ÐµQåÁ”ˆè½¹Ñ•¹ÑQåÁ”¡Á…Ñ ¹•áÑ¹…µ”¡™¥±•A…Ñ ¤¤°(€€€€‰½¹Ñ•¹Ðµ1•¹Ñ ˆè¥¹™¼¹Í¥é”°(€€€€‰…¡”µ½¹ÑÉ½°ˆè…¡•½¹ÑÉ½°¡™¥±•A…Ñ ¤°(€ô¤ì(€¥˜€¡É•ÅÕ•ÍÐ¹µ•Ñ¡½€ôôô€‰!ˆ¤É•ÑÕÉ¸É•ÍÁ½¹Í”¹•¹ ¤ì(€É•…Ñ•I•…‘MÑÉ•…´¡™¥±•A…Ñ ¤¹Á¥Á”¡É•ÍÁ½¹Í”¤ì)ô()…Íå¹Œ™Õ¹Ñ¥½¸Í•ÉÙ•	Õ¹‘±•‘ÁÁMÉ¥ÁÐ¡É•ÅÕ•ÍÐ°É•ÍÁ½¹Í”¤ì(€¥˜€¡É•ÅÕ•ÍÐ¹µ•Ñ¡½€„ôô€‰Pˆ€˜˜É•ÅÕ•ÍÐ¹µ•Ñ¡½€„ôô€‰!ˆ¤ì(€€€É•ÑÕÉ¸Í•¹‘Q•áÐ¡É•ÍÁ½¹Í”°€ÐÀÔ°€‰5•Ñ¡½¹½Ð…±±½Ý•ˆ°ì±±½Üè€‰P°!ˆô¤ì(€ô(€½¹ÍÐ•¹½‘•€ô…Ý…¥ÐÉ•…‘¥±”¡Á…Ñ ¹©½¥¸¡É½½Ñ¥È°€‰…ÁÀ¹©Ì¹‰È¹ˆØÐˆ¤°€‰ÕÑ˜àˆ¤ì(€½¹ÍÐ½¹Ñ•¹Ð€ô‰É½Ñ±¥•½µÁÉ•ÍÍMå¹Œ¡	Õ™™•È¹™É½´¡•¹½‘•¹É•Á±…” ½qÌ¬½œ°€ˆˆ¤°€‰‰…Í”ØÐˆ¤¤ì(€É•ÍÁ½¹Í”¹ÝÉ¥Ñ•!•… ÈÀÀ°ì(€€€€¸¸¹Í•ÕÉ¥Ñå!•…‘•ÉÌ°(€€€€‰½¹Ñ•¹ÐµQåÁ”ˆè€‰Ñ•áÐ½©…Ù…ÍÉ¥ÁÐì¡…ÉÍ•ÐõÕÑ˜´àˆ°(€€€€‰½¹Ñ•¹Ðµ1•¹Ñ ˆè½¹Ñ•¹Ð¹±•¹Ñ °(€€€€‰…¡”µ½¹ÑÉ½°ˆè€‰¹¼µ…¡”ˆ°(€ô¤ì(€¥˜€¡É•ÅÕ•ÍÐ¹µ•Ñ¡½€ôôô€‰!ˆ¤É•ÑÕÉ¸É•ÍÁ½¹Í”¹•¹ ¤ì(€É•ÍÁ½¹Í”¹•¹¡½¹Ñ•¹Ð¤ì)ô()™Õ¹Ñ¥½¸•ÑA½½° ¤ì(€¥˜€ …ÁÉ½•ÍÌ¹•¹Ø¹Q	M}UI0¤ì(€€€Ñ¡É½Ü¹•ÜÉÉ½È ‰Q	M}UI0ƒbëf+bÄƒff#b³f#b¼¸ƒbŸbÇb£bÜƒfbŸbçb¿b¤I•¹‘•ÈA½ÍÑÉ•ME0ƒb£bŸfb»b¿fb¤¸ˆ¤ì(€ô(€¥˜€ …Á½½°¤ì(€€€½¹ÍÐ½¹¹•Ñ¥½¹MÑÉ¥¹œ€ôÁÉ½•ÍÌ¹•¹Ø¹Q	M}UI0ì(€€€½¹ÍÐ½¹™¥œ€ôì(€€€€€½¹¹•Ñ¥½¹MÑÉ¥¹œ°(€€€€€µ…àè5…Ñ ¹µ¥¸ ÈÀ°5…Ñ ¹µ…à Ä°9Õµ‰•È¡ÁÉ½•ÍÌ¹•¹Ø¹A}A==1}5`ñð€Ô¤¤¤°(€€€€€¥‘±•Q¥µ•½ÕÑ5¥±±¥Ìè€ÌÁ|ÀÀÀ°(€€€€€½¹¹•Ñ¥½¹Q¥µ•½ÕÑ5¥±±¥Ìè€ÄÁ|ÀÀÀ°(€€€ôì(€€€¥˜€¡Í¡½Õ±‘UÍ•MÍ°¡½¹¹•Ñ¥½¹MÑÉ¥¹œ¤¤½¹™¥œ¹ÍÍ°€ôìÉ•©•ÑU¹…ÕÑ¡½É¥é•è™…±Í”ôì(€€€Á½½°€ô¹•ÜA½½°¡½¹™¥œ¤ì(€€€Á½½°¹½¸ ‰•ÉÉ½Èˆ°€¡•ÉÉ½È¤€ôø½¹Í½±”¹•ÉÉ½È ‰…Ñ…‰…Í”Á½½°•ÉÉ½Èˆ°•ÉÉ½È¤¤ì(€ô(€É•ÑÕÉ¸Á½½°ì)ô()™Õ¹Ñ¥½¸Í¡½Õ±‘UÍ•MÍ°¡½¹¹•Ñ¥½¹MÑÉ¥¹œ¤ì(€¥˜€¡ÁÉ½•ÍÌ¹•¹Ø¹Q	M}MM0¤ì(€€€É•ÑÕÉ¸€½x ÅñÑÉÕ•ñå•ÍñÉ•ÅÕ¥É•¤½¤¹Ñ•ÍÐ¡ÁÉ½•ÍÌ¹•¹Ø¹Q	M}MM0¤ì(€ô(€É•ÑÕÉ¸€½ÍÍ±µ½‘”õÉ•ÅÕ¥É”½¤¹Ñ•ÍÐ¡½¹¹•Ñ¥½¹MÑÉ¥¹œ¤ñð€½p¹É•¹‘•Ép¹½´½¤¹Ñ•ÍÐ¡½¹¹•Ñ¥½¹MÑÉ¥¹œ¤ì)ô()™Õ¹Ñ¥½¸•¹ÍÕÉ•M¡•µ„ ¤ì(€¥˜€ …Í¡•µ…I•…‘ä¤ì(€€€Í¡•µ…I•…‘ä€ô•ÑA½½° ¤(€€€€€€¹ÅÕ•Éä¡€(€€€€€€€IQQ	1%9=Pa%MQL…½Õ¹ÑÌ€ (€€€€€€€€€ÕÍ•É¹…µ”QaPAI%5Id-d°(€€€€€€€€€¹…µ”QaP9=P9U10U1P€œœ°(€€€€€€€€€•µ…¥°QaP9=P9U10U1P€œœ°(€€€€€€€€€Í…±ÐQaP9=P9U10°(€€€€€€€€€Á…ÍÍÝ½É‘}¡…Í QaP9=P9U10°(€€€€€€€€€‘…Ñ„)M=99=P9U10U1P€íôœèé©Í½¹ˆ°(€€€€€€€€€ÍÕµµ…Éä)M=99=P9U10U1P€íôœèé©Í½¹ˆ°(€€€€€€€€€É•…Ñ•‘}…ÐQ%5MQ5AQh9=P9U10U1P9=\ ¤°(€€€€€€€€€ÕÁ‘…Ñ•‘}…ÐQ%5MQ5AQh9=P9U10U1P9=\ ¤(€€€€€€€€¤ì((€€€€€€€IQQ	1%9=Pa%MQL…½Õ¹Ñ}Í•ÍÍ¥½¹Ì€ (€€€€€€€€€Ñ½­•¹}¡…Í QaPAI%5Id-d°(€€€€€€€€€ÕÍ•É¹…µ”QaP9=P9U10II9L…½Õ¹ÑÌ¡ÕÍ•É¹…µ”¤=81QM=8UAQM°(€€€€€€€€€•áÁ¥É•Í}…ÐQ%5MQ5AQh9=P9U10°(€€€€€€€€€É•…Ñ•‘}…ÐQ%5MQ5AQh9=P9U10U1P9=\ ¤°(€€€€€€€€€±…ÍÑ}ÕÍ•‘}…ÐQ%5MQ5AQh9=P9U10U1P9=\ ¤(€€€€€€€€¤ì((€€€€€€€IQ%9`%9=Pa%MQL…½Õ¹Ñ}Í•ÍÍ¥½¹Í}ÕÍ•É¹…µ•}¥‘à=8…½Õ¹Ñ}Í•ÍÍ¥½¹Ì¡ÕÍ•É¹…µ”¤ì(€€€€€€€IQ%9`%9=Pa%MQL…½Õ¹Ñ}Í•ÍÍ¥½¹Í}•áÁ¥Éå}¥‘à=8…½Õ¹Ñ}Í•ÍÍ¥½¹Ì¡•áÁ¥É•Í}…Ð¤ì(€€€€€€¤(€€€€€€¹…Ñ  ¡•ÉÉ½È¤€ôøì(€€€€€€€Í¡•µ…I•…‘ä€ô¹Õ±°ì(€€€€€€€Ñ¡É½Ü•ÉÉ½Èì(€€€€€ô¤ì(€ô(€É•ÑÕÉ¸Í¡•µ…I•…‘äì)ô()…Íå¹Œ™Õ¹Ñ¥½¸É•…‘½Õ¹Ð¡ÕÍ•É¹…µ”¤ì(€½¹ÍÐÉ•ÍÕ±Ð€ô…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä (€€€M1PÕÍ•É¹…µ”°¹…µ”°•µ…¥°°Í…±Ð°Á…ÍÍÝ½É‘}¡…Í °‘…Ñ„°ÍÕµµ…Éä°É•…Ñ•‘}…Ð°ÕÁ‘…Ñ•‘}…Ð(€€€€€€I=4…½Õ¹ÑÌ(€€€€€]!IÕÍ•É¹…µ”€ô€Å€°(€€€m¹½Éµ…±¥é•UÍ•É¹…µ”¡ÕÍ•É¹…µ”¥t°(€€¤ì(€É•ÑÕÉ¸É•ÍÕ±Ð¹É½ÝÍlÁt€üµ…Á½Õ¹Ð¡É•ÍÕ±Ð¹É½ÝÍlÁt¤€è¹Õ±°ì)ô()…Íå¹Œ™Õ¹Ñ¥½¸ÕÁÍ•ÉÑ½Õ¹Ð¡…½Õ¹Ð¤ì(€…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä (€€€%9MIP%9Q<…½Õ¹ÑÌ€ (€€€€€€ÕÍ•É¹…µ”°¹…µ”°•µ…¥°°Í…±Ð°Á…ÍÍÝ½É‘}¡…Í °‘…Ñ„°ÍÕµµ…Éä°É•…Ñ•‘}…Ð°ÕÁ‘…Ñ•‘}…Ð(€€€€€¤Y1UL€ Ä°€È°€Ì°€Ð°€Ô°€Øèé©Í½¹ˆ°€Üèé©Í½¹ˆ°€à°€ä¤(€€€€=8=91%P€¡ÕÍ•É¹…µ”¤<UAQMP(€€€€€€¹…µ”€ôa1U¹¹…µ”°(€€€€€€•µ…¥°€ôa1U¹•µ…¥°°(€€€€€€Í…±Ð€ôa1U¹Í…±Ð°(€€€€€€Á…ÍÍÝ½É‘}¡…Í €ôa1U¹Á…ÍÍÝ½É‘}¡…Í °(€€€€€€‘…Ñ„€ôa1U¹‘…Ñ„°(€€€€€€ÍÕµµ…Éä€ôa1U¹ÍÕµµ…Éä°(€€€€€€ÕÁ‘…Ñ•‘}…Ð€ôa1U¹ÕÁ‘…Ñ•‘}…Ñ€°(€€€l(€€€€€…½Õ¹Ð¹ÕÍ•É¹…µ”°(€€€€€…½Õ¹Ð¹¹…µ”°(€€€€€…½Õ¹Ð¹•µ…¥°°(€€€€€…½Õ¹Ð¹Í…±Ð°(€€€€€…½Õ¹Ð¹Á…ÍÍÝ½É‘!…Í °(€€€€€)M=8¹ÍÑÉ¥¹¥™ä¡…½Õ¹Ð¹‘…Ñ„¤°(€€€€€)M=8¹ÍÑÉ¥¹¥™ä¡…½Õ¹Ð¹ÍÕµµ…Éä¤°(€€€€€…½Õ¹Ð¹É•…Ñ•‘Ð°(€€€€€…½Õ¹Ð¹ÕÁ‘…Ñ•‘Ð°(€€€t°(€€¤ì)ô()™Õ¹Ñ¥½¸µ…Á½Õ¹Ð¡É½Ü¤ì(€É•ÑÕÉ¸ì(€€€ÕÍ•É¹…µ”èÉ½Ü¹ÕÍ•É¹…µ”°(€€€¹…µ”èÉ½Ü¹¹…µ”°(€€€•µ…¥°èÉ½Ü¹•µ…¥°°(€€€Í…±ÐèÉ½Ü¹Í…±Ð°(€€€Á…ÍÍÝ½É‘!…Í èÉ½Ü¹Á…ÍÍÝ½É‘}¡…Í °(€€€‘…Ñ„èÉ½Ü¹‘…Ñ„ñð¹Õ±°°(€€€ÍÕµµ…ÉäèÉ½Ü¹ÍÕµµ…Éäñð¹Õ±°°(€€€É•…Ñ•‘ÐèÉ½Ü¹É•…Ñ•‘}…Ð¥¹ÍÑ…¹•½˜…Ñ”€üÉ½Ü¹É•…Ñ•‘}…Ð¹Ñ½%M=MÑÉ¥¹œ ¤€èÉ½Ü¹É•…Ñ•‘}…Ð°(€€€ÕÁ‘…Ñ•‘ÐèÉ½Ü¹ÕÁ‘…Ñ•‘}…Ð¥¹ÍÑ…¹•½˜…Ñ”€üÉ½Ü¹ÕÁ‘…Ñ•‘}…Ð¹Ñ½%M=MÑÉ¥¹œ ¤€èÉ½Ü¹ÕÁ‘…Ñ•‘}…Ð°(€ôì)ô()™Õ¹Ñ¥½¸ÁÕ‰±¥I•ÍÁ½¹Í”¡…½Õ¹Ð°Ñ½­•¸¤ì(€É•ÑÕÉ¸ì(€€€ÕÍ•Èèì(€€€€€ÕÍ•É¹…µ”è…½Õ¹Ð¹ÕÍ•É¹…µ”°(€€€€€¹…µ”è…½Õ¹Ð¹¹…µ”°(€€€€€•µ…¥°è…½Õ¹Ð¹•µ…¥°°(€€€€€É•…Ñ•‘Ðè…½Õ¹Ð¹É•…Ñ•‘Ð°(€€€€€ÕÁ‘…Ñ•‘Ðè…½Õ¹Ð¹ÕÁ‘…Ñ•‘Ð°(€€€ô°(€€€‘…Ñ„è…½Õ¹Ð¹‘…Ñ„ñð¹Õ±°°(€€€€¸¸¸¡Ñ½­•¸€üìÑ½­•¸ô€èíô¤°(€ôì)ô()…Íå¹Œ™Õ¹Ñ¥½¸ÉÕ¹5…¥¹Ñ•¹…¹•Q…Í­Ì ¤ì(€¥˜€ …ÁÉ½•ÍÌ¹•¹Ø¹Q	M}UI0¤É•ÑÕÉ¸ì(€…Ý…¥Ð•¹ÍÕÉ•M¡•µ„ ¤ì((€½¹ÍÐ‘•±•Ñ•UÍ•ÉÌ€ôÍÁ±¥Ñ¹Ù1¥ÍÐ¡ÁÉ½•ÍÌ¹•¹Ø¹1Q}=U9Q}9=\¤ì(€™½È€¡½¹ÍÐÕÍ•É¹…µ”½˜‘•±•Ñ•UÍ•ÉÌ¤ì(€€€…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä¡1QI=4…½Õ¹ÑÌ]!IÕÍ•É¹…µ”€ô€Å€°m¹½Éµ…±¥é•UÍ•É¹…µ”¡ÕÍ•É¹…µ”¥t¤ì(€ô((€™½È€¡½¹ÍÐmÕÍ•É¹…µ”°¹•ÝA…ÍÍÝ½É‘t½˜Á…ÉÍ•¹ÙA…¥ÉÌ¡ÁÉ½•ÍÌ¹•¹Ø¹!9}AMM]=I¤¤ì(€€€¥˜€ …¹•ÝA…ÍÍÝ½É¤½¹Ñ¥¹Õ”ì(€€€½¹ÍÐÍ…±Ð€ôÉåÁÑ¼¹É…¹‘½µ	åÑ•Ì ÄØ¤¹Ñ½MÑÉ¥¹œ ‰¡•àˆ¤ì(€€€½¹ÍÐÁ…ÍÍÝ½É‘!…Í €ô…Ý…¥Ð¡…Í¡A…ÍÍÝ½É¡¹•ÝA…ÍÍÝ½É°Í…±Ð¤ì(€€€…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä (€€€€€UAQ…½Õ¹ÑÌMPÍ…±Ð€ô€È°Á…ÍÍÝ½É‘}¡…Í €ô€Ì°ÕÁ‘…Ñ•‘}…Ð€ô9=\ ¤]!IÕÍ•É¹…µ”€ô€Å€°(€€€€€m¹½Éµ…±¥é•UÍ•É¹…µ”¡ÕÍ•É¹…µ”¤°Í…±Ð°Á…ÍÍÝ½É‘!…Í¡t°(€€€€¤ì(€€€…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä¡1QI=4…½Õ¹Ñ}Í•ÍÍ¥½¹Ì]!IÕÍ•É¹…µ”€ô€Å€°l(€€€€€¹½Éµ…±¥é•UÍ•É¹…µ”¡ÕÍ•É¹…µ”¤°(€€€t¤ì(€ô((€™½È€¡½¹ÍÐm½±‘UÍ•É¹…µ”°¹•ÝUÍ•É¹…µ•t½˜Á…ÉÍ•¹ÙA…¥ÉÌ¡ÁÉ½•ÍÌ¹•¹Ø¹!9}UMI95¤¤ì(€€€½¹ÍÐ½±‘Y…±Õ”€ô¹½Éµ…±¥é•UÍ•É¹…µ”¡½±‘UÍ•É¹…µ”¤ì(€€€½¹ÍÐ¹•ÝY…±Õ”€ô¹½Éµ…±¥é•UÍ•É¹…µ”¡¹•ÝUÍ•É¹…µ”¤ì(€€€¥˜€¡½±‘Y…±Õ”€˜˜€½ymqÁí1õqÁí9ô¹|µuìÌ°ÔÁô½Ô¹Ñ•ÍÐ¡¹•ÝY…±Õ”¤¤ì(€€€€€…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä¡UAQ…½Õ¹ÑÌMPÕÍ•É¹…µ”€ô€È°ÕÁ‘…Ñ•‘}…Ð€ô9=\ ¤]!IÕÍ•É¹…µ”€ô€Å€°l(€€€€€€€½±‘Y…±Õ”°(€€€€€€€¹•ÝY…±Õ”°(€€€€€t¤ì(€€€ô(€ô((€™½È€¡½¹ÍÐmÕÍ•É¹…µ”°¹…µ•t½˜Á…ÉÍ•¹ÙA…¥ÉÌ¡ÁÉ½•ÍÌ¹•¹Ø¹!9}95¤¤ì(€€€…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä¡UAQ…½Õ¹ÑÌMP¹…µ”€ô€È°ÕÁ‘…Ñ•‘}…Ð€ô9=\ ¤]!IÕÍ•É¹…µ”€ô€Å€°l(€€€€€¹½Éµ…±¥é•UÍ•É¹…µ”¡ÕÍ•É¹…µ”¤°(€€€€€±•…¹Q•áÐ¡¹…µ”°€àÀ¤°(€€€t¤ì(€ô((€™½È€¡½¹ÍÐmÕÍ•É¹…µ”°•µ…¥±t½˜Á…ÉÍ•¹ÙA…¥ÉÌ¡ÁÉ½•ÍÌ¹•¹Ø¹!9}5%0¤¤ì(€€€…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä¡UAQ…½Õ¹ÑÌMP•µ…¥°€ô€È°ÕÁ‘…Ñ•‘}…Ð€ô9=\ ¤]!IÕÍ•É¹…µ”€ô€Å€°l(€€€€€¹½Éµ…±¥é•UÍ•É¹…µ”¡ÕÍ•É¹…µ”¤°(€€€€€±•…¹Q•áÐ¡•µ…¥°°€ÄÈÀ¤°(€€€t¤ì(€ô((€½¹ÍÐÍÑ½É•‘½Õ¹ÑÌ€ô…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä¡M1PÕÍ•É¹…µ”°‘…Ñ„I=4…½Õ¹ÑÍ€¤ì(€™½È€¡½¹ÍÐÉ½Ü½˜ÍÑ½É•‘½Õ¹ÑÌ¹É½ÝÌ¤ì(€€€½¹ÍÐ½µÁ…Ð€ô½µÁ…Ñ½Õ¹Ñ…Ñ„¡É½Ü¹‘…Ñ„¤ì(€€€½¹ÍÐÍÕµµ…Éä€ô‰Õ¥±‘MÕµµ…Éä¡½µÁ…Ð¤ì(€€€…Ý…¥Ð•ÑA½½° ¤¹ÅÕ•Éä (€€€€€UAQ…½Õ¹ÑÌ(€€€€€€€€€MP‘…Ñ„€ô€Èèé©Í½¹ˆ°ÍÕµµ…Éä€ô€Ìèé©Í½¹ˆ°ÕÁ‘…Ñ•‘}…Ð€ô9=\ ¤(€€€€€€€]!IÕÍ•É¹…µ”€ô€Ä(€€€€€€€€€9‘…Ñ„%L%MQ%9PI=4€Èèé©Í½¹‰€°(€€€€€mÉ½Ü¹ÕÍ•É¹…µ”°)M=8¹ÍÑÉ¥¹¥™ä¡½µÁ…Ð¤°)M=8¹ÍÑÉ¥¹¥™ä¡ÍÕµµ…Éä¥t°(€€€€¤ì(€ô)ô()™Õ¹Ñ¥½¸ÍÁ±¥Ñ¹Ù1¥ÍÐ¡Ù…±Õ”¤ì(€É•ÑÕÉ¸MÑÉ¥¹œ¡Ù…±Õ”ñð€ˆˆ¤(€€€€¹ÍÁ±¥Ð ˆ°ˆ¤(€€€€¹µ…À ¡¥Ñ•´¤€ôø¥Ñ•´¹ÑÉ¥´ ¤¤(€€€€¹™¥±Ñ•È¡	½½±•…¸¤ì)ô()™Õ¹Ñ¥½¸Á…ÉÍ•¹ÙA…¥ÉÌ¡Ù…±Õ”¤ì(€É•ÑÕÉ¸ÍÁ±¥Ñ¹Ù1¥ÍÐ¡Ù…±Õ”¤(€€€€¹µ…À ¡¥Ñ•´¤€ôøì(€€€€€½¹ÍÐÍ•Á…É…Ñ½È€ô¥Ñ•´¹¥¹‘•á=˜ ˆèˆ¤ì(€€€€€É•ÑÕÉ¸Í•Á…É…Ñ½È€ø€À(€€€€€€€€üm¥Ñ•´¹Í±¥” À°Í•Á…É…Ñ½È¤¹ÑÉ¥´ ¤°¥Ñ•´¹Í±¥”¡Í•Á…É…Ñ½È€¬€Ä¤¹ÑÉ¥´ ¥t(€€€€€€€€è¹Õ±°ì(€€€ô¤(€€€€¹™¥±Ñ•È¡	½½±•…¸¤ì)ô()…Íå¹Œ™Õ¹Ñ¥½¸É•…‘)Í½¹	½‘ä¡É•ÅÕ•ÍÐ¤ì(€½¹ÍÐ½¹Ñ•¹ÑQåÁ•Y…±Õ”€ôMÑÉ¥¹œ¡É•ÅÕ•ÍÐ¹¡•…‘•ÉÍl‰½¹Ñ•¹ÐµÑåÁ”‰tñð€ˆˆ¤ì(€¥˜€ …½¹Ñ•¹ÑQåÁ•Y…±Õ”¹Ñ½1½Ý•É…Í” ¤¹ÍÑ…ÉÑÍ]¥Ñ  ‰…ÁÁ±¥…Ñ¥½¸½©Í½¸ˆ¤¤ì(€€€½¹ÍÐ•ÉÉ½È€ô¹•ÜÉÉ½È ‹ff#bäƒbŸffb·b«f#f$ƒf+b³b ƒbfƒf+ff#f)M=8ˆ¤ì(€€€•ÉÉ½È¹ÍÑ…ÑÕÌ€ô€ÐÄÔì(€€€Ñ¡É½Ü•ÉÉ½Èì(€ô((€½¹ÍÐ¡Õ¹­Ì€ômtì(€±•ÐÑ½Ñ…°€ô€Àì(€™½È…Ý…¥Ð€¡½¹ÍÐ¡Õ¹¬½˜É•ÅÕ•ÍÐ¤ì(€€€Ñ½Ñ…°€¬ô¡Õ¹¬¹±•¹Ñ ì(€€€¥˜€¡Ñ½Ñ…°€øµ…á	½‘å	åÑ•Ì¤ì(€€€€€½¹ÍÐ•ÉÉ½È€ô¹•ÜÉÉ½È ‹b·b³fƒbŸfbßfb ƒbfb£bÄƒffƒbŸffbÏff#b´ˆ¤ì(€€€€€•ÉÉ½È¹ÍÑ…ÑÕÌ€ô€ÐÄÌì(€€€€€Ñ¡É½Ü•ÉÉ½Èì(€€€ô(€€€¡Õ¹­Ì¹ÁÕÍ ¡¡Õ¹¬¤ì(€ô(€¥˜€ …¡Õ¹­Ì¹±•¹Ñ ¤É•ÑÕÉ¸íôì(€ÑÉäì(€€€É•ÑÕÉ¸)M=8¹Á…ÉÍ”¡	Õ™™•È¹½¹…Ð¡¡Õ¹­Ì¤¹Ñ½MÑÉ¥¹œ ‰ÕÑ˜àˆ¤¤ì(€ô…Ñ ì(€€€½¹ÍÐ•ÉÉ½È€ô¹•ÜÉÉ½È ‹b×f+bëb¤)M=8ƒbëf+bÄƒb×bŸfb·b¤ˆ¤ì(€€€•ÉÉ½È¹ÍÑ…ÑÕÌ€ô€ÐÀÀì(€€€Ñ¡É½Ü•ÉÉ½Èì(€ô)ô()™Õ¹Ñ¥½¸¡…¹‘±•Á¥ÉÉ½È¡É•ÍÁ½¹Í”°±…‰•°°•ÉÉ½È¤ì(€½¹Í½±”¹•ÉÉ½È¡±…‰•°°•ÉÉ½È¤ì(€½¹ÍÐÍÑ…ÑÕÌ€ô9Õµ‰•È¡•ÉÉ½Èü¹ÍÑ…ÑÕÌ¤ì(€¥˜€¡lÐÀÀ°€ÐÄÌ°€ÐÄÕt¹¥¹±Õ‘•Ì¡ÍÑ…ÑÕÌ¤¤ì(€€€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°ÍÑ…ÑÕÌ°ì•ÉÉ½Èè±•…¹Q•áÐ¡•ÉÉ½È¹µ•ÍÍ…”°€ÄàÀ¤ô¤ì(€ô(€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°€ÔÀÀ°ì•ÉÉ½Èè€‹b«bçbÃbÄƒb—ffbŸfƒbŸfbßfb ƒbŸfb‹fˆô¤ì)ô()™Õ¹Ñ¥½¸±•…¹Q•áÐ¡Ù…±Õ”°µ…à€ô€ÈÐÀ¤ì(€É•ÑÕÉ¸MÑÉ¥¹œ¡Ù…±Õ”ñð€ˆˆ¤¹ÑÉ¥´ ¤¹Í±¥” À°µ…à¤ì)ô()™Õ¹Ñ¥½¸±•…¹%¡Ù…±Õ”¤ì(€½¹ÍÐ¥€ôMÑÉ¥¹œ¡Ù…±Õ”ñð€ˆˆ¤ì(€É•ÑÕÉ¸€½ym„µéµhÀ´ä¹|èµuìÄ°ÈÐÁô¼¹Ñ•ÍÐ¡¥¤€ü¥€è€ˆˆì)ô()™Õ¹Ñ¥½¸¹½Éµ…±¥é•UÍ•É¹…µ”¡Ù…±Õ”¤ì(€É•ÑÕÉ¸±•…¹Q•áÐ¡Ù…±Õ”°€ÔÀ¤¹Ñ½1½…±•1½Ý•É…Í” ‰…ÈµMˆ¤ì)ô()™Õ¹Ñ¥½¸Í•¹‘)Í½¸¡É•ÍÁ½¹Í”°ÍÑ…ÑÕÌ°‰½‘ä°¡•…‘•ÉÌ€ôíô¤ì(€É•ÍÁ½¹Í”¹ÝÉ¥Ñ•!•…¡ÍÑ…ÑÕÌ°ì€¸¸¹©Í½¹!•…‘•ÉÌ°€¸¸¹Í•ÕÉ¥Ñå!•…‘•ÉÌ°€¸¸¹¡•…‘•ÉÌô¤ì(€É•ÍÁ½¹Í”¹•¹¡)M=8¹ÍÑÉ¥¹¥™ä¡‰½‘ä¤¤ì)ô()™Õ¹Ñ¥½¸Í•¹‘Q•áÐ¡É•ÍÁ½¹Í”°ÍÑ…ÑÕÌ°‰½‘ä°¡•…‘•ÉÌ€ôíô¤ì(€É•ÍÁ½¹Í”¹ÝÉ¥Ñ•!•…¡ÍÑ…ÑÕÌ°ì(€€€€¸¸¹Í•ÕÉ¥Ñå!•…‘•ÉÌ°(€€€€‰½¹Ñ•¹ÐµQåÁ”ˆè€‰Ñ•áÐ½Á±…¥¸ì¡…ÉÍ•ÐõÕÑ˜´àˆ°(€€€€¸¸¹¡•…‘•ÉÌ°(€ô¤ì(€É•ÍÁ½¹Í”¹•¹¡‰½‘ä¤ì)ô()™Õ¹Ñ¥½¸½¹Ñ•¹ÑQåÁ”¡•áÑ•¹Í¥½¸¤ì(€É•ÑÕÉ¸ì(€€€€ˆ¹¡Ñµ°ˆè€‰Ñ•áÐ½¡Ñµ°ì¡…ÉÍ•ÐõÕÑ˜´àˆ°(€€€€ˆ¹ÍÌˆè€‰Ñ•áÐ½ÍÌì¡…ÉÍ•ÐõÕÑ˜´àˆ°(€€€€ˆ¹©Ìˆè€‰Ñ•áÐ½©…Ù…ÍÉ¥ÁÐì¡…ÉÍ•ÐõÕÑ˜´àˆ°(€€€€ˆ¹µ©Ìˆè€‰Ñ•áÐ½©…Ù…ÍÉ¥ÁÐì¡…ÉÍ•ÐõÕÑ˜´àˆ°(€€€€ˆ¹ÍÙœˆè€‰¥µ…”½ÍÙœ­áµ°ˆ°(€õm•áÑ•¹Í¥½¸¹Ñ½1½Ý•É…Í” ¥tñð€‰…ÁÁ±¥…Ñ¥½¸½½Ñ•ÐµÍÑÉ•…´ˆì)ô()™Õ¹Ñ¥½¸…¡•½¹ÑÉ½°¡™¥±•A…Ñ ¤ì(€½¹ÍÐ¹…µ”€ôÁ…Ñ ¹‰…Í•¹…µ”¡™¥±•A…Ñ ¤ì(€É•ÑÕÉ¸l‰¥¹‘•à¹¡Ñµ°ˆ°€‰…ÁÀ¹©Ìˆ°€‰½É”¹µ©Ìˆ°€‰ÍÑå±•Ì¹ÍÌˆ°€‰ÍÜ¹©Ì‰t¹¥¹±Õ‘•Ì¡¹…µ”¤(€€€€ü€‰¹¼µ…¡”ˆ(€€€€è€‰ÁÕ‰±¥Œ°µ…àµ…”ôÌØÀÀˆì)ô
+          `UPDATE accounts SET salt = $2, password_hash = $3, updated_at = NOW()
+            WHERE username = $1`,
+          [targetUsername, salt, passwordHash],
+        );
+        await client.query(`DELETE FROM account_sessions WHERE username = $1`, [targetUsername]);
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+      logAdminAction(authenticated.account.username, "Ø¥Ø¹Ø§Ø¯Ø© ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±", targetUsername);
+      return sendJson(response, 200, { ok: true });
+    }
+
+    if (body.action === "signout-user") {
+      const targetUsername = normalizeUsername(body.targetUsername);
+      if (!targetUsername || !(await readAccount(targetUsername))) {
+        return sendJson(response, 404, { error: "Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯" });
+      }
+      if (targetUsername === normalizeUsername(authenticated.account.username)) {
+        return sendJson(response, 400, { error: "Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¥Ù†Ù‡Ø§Ø¡ Ø¬Ù„Ø³ØªÙƒ Ù…Ù† Ù„ÙˆØ­Ø© Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©" });
+      }
+      await getPool().query(`DELETE FROM account_sessions WHERE username = $1`, [targetUsername]);
+      logAdminAction(authenticated.account.username, "ØªØ³Ø¬ÙŠÙ„ Ø®Ø±ÙˆØ¬ Ø§Ù„Ø­Ø³Ø§Ø¨", targetUsername);
+      return sendJson(response, 200, { ok: true });
+    }
+
+    if (body.action === "delete-user") {
+      const targetUsername = normalizeUsername(body.targetUsername);
+      if (!targetUsername || !(await readAccount(targetUsername))) {
+        return sendJson(response, 404, { error: "Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯" });
+      }
+      if (
+        targetUsername === normalizeUsername(authenticated.account.username) ||
+        isAdminUser(targetUsername)
+      ) {
+        return sendJson(response, 400, { error: "Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø­Ø°Ù Ø­Ø³Ø§Ø¨ Ù…Ø¯ÙŠØ± Ù…Ù† Ù„ÙˆØ­Ø© Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©" });
+      }
+      await getPool().query(`DELETE FROM accounts WHERE username = $1`, [targetUsername]);
+      logAdminAction(authenticated.account.username, "Ø­Ø°Ù Ø§Ù„Ø­Ø³Ø§Ø¨", targetUsername);
+      return sendJson(response, 200, { ok: true });
+    }
+
+    return sendJson(response, 400, { error: "Ø·Ù„Ø¨ ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ" });
+  } catch (error) {
+    return handleApiError(response, "Admin API error", error);
+  }
+}
+
+function adminUserSummary(row) {
+  const summary = row?.summary && typeof row.summary === "object" ? row.summary : {};
+  return {
+    username: normalizeUsername(row?.username),
+    name: cleanText(row?.name, 80),
+    email: cleanText(row?.email, 120),
+    isAdmin: isAdminUser(row?.username),
+    taskSettingsCount: Number(summary.taskSettingsCount || 0),
+    completedCount: Number(summary.completedCount || 0),
+    createdAt: row?.created_at instanceof Date ? row.created_at.toISOString() : row?.created_at || null,
+    updatedAt: row?.updated_at instanceof Date ? row.updated_at.toISOString() : row?.updated_at || null,
+  };
+}
+
+function logAdminAction(adminUsername, action, targetUsername) {
+  console.info(
+    `Ø¥Ø¬Ø±Ø§Ø¡ Ø¥Ø¯Ø§Ø±ÙŠ: ${cleanText(action, 60)} | Ø§Ù„Ù…Ø¯ÙŠØ±=${normalizeUsername(adminUsername)} | Ø§Ù„Ø­Ø³Ø§Ø¨=${normalizeUsername(targetUsername)}`,
+  );
+}
+
+function buildAdminRevealReport(account, monthStart, monthEnd, monthLabel) {
+  const data = hydrateAccountData(account.data);
+  const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+  const instances =
+    data.instances && typeof data.instances === "object" ? Object.values(data.instances) : [];
+  const monthInstances = instances.filter(
+    (item) => item?.date && item.date >= monthStart && item.date <= monthEnd,
+  );
+  const lastLogin = cleanText(data?.user?.loggedInAt || "", 40) || null;
+
+  const taskReports = tasks.map((task) => {
+    const taskInstances = monthInstances.filter((item) => item.taskId === task.id);
+    const completedInstances = taskInstances.filter((item) => item.status === "completed");
+    const lastAppearanceInstance = taskInstances
+      .slice()
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+    const lastCompletedInstance = completedInstances
+      .slice()
+      .sort((a, b) =>
+        String(b.completedAt || b.updatedAt || "").localeCompare(
+          String(a.completedAt || a.updatedAt || ""),
+        ),
+      )[0];
+
+    return {
+      id: cleanId(task.id),
+      title: cleanText(task.title, 120),
+      active: task.active !== false,
+      createdAt: task.createdAt || null,
+      appearanceFrom: task.time || null,
+      appearanceTo: task.endTime || null,
+      lastAppearance: lastAppearanceInstance?.date || null,
+      lastCompletion: lastCompletedInstance?.completedAt || lastCompletedInstance?.updatedAt || null,
+      completionCount: completedInstances.length,
+      monthRecords: taskInstances.length,
+    };
+  });
+
+  return {
+    user: {
+      username: account.username,
+      name: account.name,
+      email: account.email,
+      isAdmin: isAdminUser(account.username),
+      createdAt: account.createdAt,
+      updatedAt: account.updatedAt,
+      lastLogin,
+    },
+    month: { start: monthStart, end: monthEnd, label: monthLabel },
+    tasks: taskReports,
+  };
+}
+
+async function authenticateRequest(request, body) {
+  const token = bearerToken(request);
+  if (token) {
+    const tokenHash = hashToken(token);
+    const result = await getPool().query(
+      `SELECT a.username, a.name, a.email, a.salt, a.password_hash, a.data, a.summary,
+              a.created_at, a.updated_at
+         FROM account_sessions s
+         JOIN accounts a ON a.username = s.username
+        WHERE s.token_hash = $1 AND s.expires_at > NOW()`,
+      [tokenHash],
+    );
+    if (result.rows[0]) {
+      getPool()
+        .query(`UPDATE account_sessions SET last_used_at = NOW() WHERE token_hash = $1`, [tokenHash])
+        .catch(() => {});
+      return { account: mapAccount(result.rows[0]), tokenHash };
+    }
+  }
+
+  const username = normalizeUsername(body.username);
+  const password = String(body.password || "");
+  if (!username || !password) return null;
+  const account = await authenticateAccount(username, password, true);
+  return account ? { account, tokenHash: null } : null;
+}
+
+async function authenticateAccount(username, password, upgradeLegacy = false) {
+  const account = await readAccount(username);
+  if (!account || !(await verifyPassword(account, password))) return null;
+  if (upgradeLegacy && isLegacyPassword(account)) {
+    const salt = crypto.randomBytes(16).toString("hex");
+    const passwordHash = await hashPassword(password, salt);
+    await getPool().query(
+      `UPDATE accounts SET salt = $2, password_hash = $3, updated_at = NOW() WHERE username = $1`,
+      [account.username, salt, passwordHash],
+    );
+    account.salt = salt;
+    account.passwordHash = passwordHash;
+  }
+  return account;
+}
+
+function isLegacyPassword(account) {
+  return !account.salt || !/^[a-f0-9]{128}$/i.test(account.passwordHash || "");
+}
+
+async function verifyPassword(account, password) {
+  if (!password) return false;
+  if (isLegacyPassword(account)) {
+    return constantTimeTextEqual(account.passwordHash || "", password);
+  }
+  const candidate = await hashPassword(password, account.salt);
+  return constantTimeTextEqual(account.passwordHash, candidate);
+}
+
+async function hashPassword(password, salt) {
+  const derived = await scrypt(String(password), String(salt), 64, {
+    N: 16384,
+    r: 8,
+    p: 1,
+    maxmem: 64 * 1024 * 1024,
+  });
+  return Buffer.from(derived).toString("hex");
+}
+
+function constantTimeTextEqual(first, second) {
+  const left = Buffer.from(String(first));
+  const right = Buffer.from(String(second));
+  if (left.length !== right.length) {
+    crypto.timingSafeEqual(left, Buffer.alloc(left.length));
+    return false;
+  }
+  return crypto.timingSafeEqual(left, right);
+}
+
+async function createSession(username) {
+  const token = crypto.randomBytes(32).toString("base64url");
+  const tokenHash = hashToken(token);
+  await getPool().query(
+    `INSERT INTO account_sessions (token_hash, username, expires_at)
+     VALUES ($1, $2, NOW() + make_interval(days => $3::int))`,
+    [tokenHash, username, sessionDays],
+  );
+  getPool().query(`DELETE FROM account_sessions WHERE expires_at <= NOW()`).catch(() => {});
+  return token;
+}
+
+function bearerToken(request) {
+  const match = /^Bearer\s+([A-Za-z0-9_-]{20,})$/i.exec(String(request.headers.authorization || ""));
+  return match ? match[1] : "";
+}
+
+function hashToken(token) {
+  return crypto.createHash("sha256").update(String(token)).digest("hex");
+}
+
+function mergeCloudData(existingInput, incomingInput) {
+  const existing = hydrateAccountData(sanitizeData(existingInput, incomingInput?.user?.username));
+  const incoming = hydrateAccountData(sanitizeData(incomingInput, incomingInput?.user?.username));
+  if (!Object.keys(existing).length) return compactAccountData(incoming);
+  if (!Object.keys(incoming).length) return compactAccountData(existing);
+
+  const existingMeta = existing.meta || {};
+  const incomingMeta = incoming.meta || {};
+  const meta = {
+    taskTombstones: mergeTimestampMaps(
+      existingMeta.taskTombstones,
+      incomingMeta.taskTombstones,
+    ),
+    instanceTombstones: mergeTimestampMaps(
+      existingMeta.instanceTombstones,
+      incomingMeta.instanceTombstones,
+    ),
+    runtimeResetAt: latestTimestamp(existingMeta.runtimeResetAt, incomingMeta.runtimeResetAt),
+  };
+
+  const tasks = mergeRecords(existing.tasks, incoming.tasks)
+    .filter((task) => isAfterTombstone(task.updatedAt, meta.taskTombstones[task.id]))
+    .slice(0, 1000);
+  const instances = Object.fromEntries(
+    mergeRecords(Object.values(existing.instances || {}), Object.values(incoming.instances || {}))
+      .filter((instance) => {
+        const deletedAt = latestTimestamp(
+          meta.instanceTombstones[instance.id],
+          meta.runtimeResetAt,
+        );
+        return isAfterTombstone(instance.updatedAt || instance.createdAt, deletedAt);
+      })
+      .slice(-50_000)
+      .map((instance) => [instance.id, instance]),
+  );
+
+  const existingSettings = existing.settings || {};
+  const incomingSettings = incoming.settings || {};
+  const snapshots = mergeRecords(existingSettings.snapshots, incomingSettings.snapshots)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .slice(0, 30);
+
+  return compactAccountData({
+    ...existing,
+    ...incoming,
+    version: Math.max(Number(existing.version || 1), Number(incoming.version || 1)),
+    user: { ...(existing.user || {}), ...(incoming.user || {}) },
+    tasks,
+    instances,
+    settings: {
+      ...existingSettings,
+      ...incomingSettings,
+      snapshots,
+      statsExcludedInstanceIds: uniqueStrings(
+        existingSettings.statsExcludedInstanceIds,
+        incomingSettings.statsExcludedInstanceIds,
+      ),
+      hiddenListInstanceIds: uniqueStrings(
+        existingSettings.hiddenListInstanceIds,
+        incomingSettings.hiddenListInstanceIds,
+      ),
+    },
+    meta,
+  });
+}
+
+function mergeRecords(first, second) {
+  const map = new Map();
+  [...(Array.isArray(first) ? first : []), ...(Array.isArray(second) ? second : [])].forEach(
+    (item) => {
+      if (!item?.id) return;
+      const current = map.get(item.id);
+      if (
+        !current ||
+        new Date(item.updatedAt || item.createdAt || 0).getTime() >=
+          new Date(current.updatedAt || current.createdAt || 0).getTime()
+      ) {
+        map.set(item.id, item);
+      }
+    },
+  );
+  return Array.from(map.values());
+}
+
+function mergeTimestampMaps(first, second) {
+  const merged = { ...(first || {}) };
+  Object.entries(second || {}).forEach(([id, value]) => {
+    merged[id] = latestTimestamp(merged[id], value);
+  });
+  return merged;
+}
+
+function latestTimestamp(first, second) {
+  if (!first) return second || null;
+  if (!second) return first;
+  return new Date(first).getTime() >= new Date(second).getTime() ? first : second;
+}
+
+function isAfterTombstone(updatedAt, deletedAt) {
+  if (!deletedAt) return true;
+  return new Date(updatedAt || 0).getTime() > new Date(deletedAt).getTime();
+}
+
+function uniqueStrings(first, second) {
+  return Array.from(
+    new Set([...(Array.isArray(first) ? first : []), ...(Array.isArray(second) ? second : [])]),
+  ).slice(-50_000);
+}
+
+function sanitizeData(data, username) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return {};
+  const safe = structuredClone(data);
+  if (safe.user && typeof safe.user === "object") {
+    safe.user = {
+      name: cleanText(safe.user.name, 80),
+      email: cleanText(safe.user.email, 120),
+      username: normalizeUsername(username || safe.user.username),
+      loggedInAt: cleanText(safe.user.loggedInAt, 40),
+    };
+  }
+  safe.tasks = (Array.isArray(safe.tasks) ? safe.tasks : []).slice(0, 1000);
+  safe.instances = Object.fromEntries(
+    Object.entries(
+      safe.instances && typeof safe.instances === "object" && !Array.isArray(safe.instances)
+        ? safe.instances
+        : {},
+    )
+      .filter(([id, item]) => cleanId(id) && item && typeof item === "object")
+      .slice(-50_000),
+  );
+  safe.settings = safe.settings && typeof safe.settings === "object" ? safe.settings : {};
+  safe.settings.snapshots = (Array.isArray(safe.settings.snapshots)
+    ? safe.settings.snapshots
+    : []
+  ).slice(0, 30);
+  safe.meta = safe.meta && typeof safe.meta === "object" ? safe.meta : {};
+  safe.meta.taskTombstones = sanitizeTimestampMap(safe.meta.taskTombstones);
+  safe.meta.instanceTombstones = sanitizeTimestampMap(safe.meta.instanceTombstones);
+  delete safe.imports;
+  return safe;
+}
+
+function sanitizeTimestampMap(value) {
+  return Object.fromEntries(
+    Object.entries(value && typeof value === "object" ? value : {})
+      .filter(
+        ([id, timestamp]) =>
+          cleanId(id) && Number.isFinite(new Date(String(timestamp || "")).getTime()),
+      )
+      .slice(-50_000),
+  );
+}
+
+function buildSummary(data) {
+  const tasks = Array.isArray(data?.tasks) ? data.tasks : [];
+  const instances =
+    data?.instances && typeof data.instances === "object" ? Object.values(data.instances) : [];
+  return {
+    taskSettingsCount: tasks.length,
+    taskRecordsCount: instances.length,
+    completedCount: instances.filter((item) => item?.status === "completed").length,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function validateNewAccount({ username, password, name, email }) {
+  if (!/^[\p{L}\p{N}._-]{3,50}$/u.test(username)) {
+    return "Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… ÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† Ù…Ù† 3 Ø¥Ù„Ù‰ 50 Ø­Ø±ÙÙ‹Ø§ Ø¯ÙˆÙ† Ù…Ø³Ø§ÙØ§Øª";
+  }
+  if (password.length < 8 || password.length > 128) {
+    return "ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø¨ÙŠÙ† 8 Ùˆ128 Ø­Ø±ÙÙ‹Ø§";
+  }
+  if (!name) return "Ø§Ù„Ø§Ø³Ù… Ù…Ø·Ù„ÙˆØ¨";
+  if (!isValidEmail(email)) return "Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ ØºÙŠØ± ØµØ§Ù„Ø­";
+  return "";
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanText(value, 120));
+}
+
+function requestAttemptKey(request, username) {
+  const forwarded = String(request.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  return `${forwarded || request.socket.remoteAddress || "unknown"}:${username}`;
+}
+
+function isRateLimited(key) {
+  const cutoff = Date.now() - 15 * 60_000;
+  const attempts = (loginAttempts.get(key) || []).filter((time) => time >= cutoff);
+  if (attempts.length) loginAttempts.set(key, attempts);
+  return attempts.length >= 8;
+}
+
+function recordFailedAttempt(key) {
+  const attempts = loginAttempts.get(key) || [];
+  attempts.push(Date.now());
+  loginAttempts.set(key, attempts.slice(-8));
+}
+
+function clearAttempts(key) {
+  loginAttempts.delete(key);
+}
+
+async function serveStaticFile(request, response, pathname) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return sendText(response, 405, "Method not allowed", { Allow: "GET, HEAD" });
+  }
+
+  const requestedPath = pathname === "/" ? "/index.html" : pathname;
+  if (!publicFiles.has(requestedPath)) return sendText(response, 404, "Not found");
+  const filePath = path.join(rootDir, requestedPath.slice(1));
+  const relative = path.relative(rootDir, filePath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    return sendText(response, 403, "Forbidden");
+  }
+
+  let info;
+  try {
+    info = await stat(filePath);
+  } catch {
+    return sendText(response, 404, "Not found");
+  }
+  if (!info.isFile()) return sendText(response, 404, "Not found");
+
+  response.writeHead(200, {
+    ...securityHeaders,
+    "Content-Type": contentType(path.extname(filePath)),
+    "Content-Length": info.size,
+    "Cache-Control": cacheControl(filePath),
+  });
+  if (request.method === "HEAD") return response.end();
+  createReadStream(filePath).pipe(response);
+}
+
+async function serveBundledAppScript(request, response) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return sendText(response, 405, "Method not allowed", { Allow: "GET, HEAD" });
+  }
+  const encoded = await readFile(path.join(rootDir, "app.js.br.b64"), "utf8");
+  const content = brotliDecompressSync(Buffer.from(encoded.replace(/\s+/g, ""), "base64"));
+  response.writeHead(200, {
+    ...securityHeaders,
+    "Content-Type": "text/javascript; charset=utf-8",
+    "Content-Length": content.length,
+    "Cache-Control": "no-cache",
+  });
+  if (request.method === "HEAD") return response.end();
+  response.end(content);
+}
+
+function getPool() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯. Ø§Ø±Ø¨Ø· Ù‚Ø§Ø¹Ø¯Ø© Render PostgreSQL Ø¨Ø§Ù„Ø®Ø¯Ù…Ø©.");
+  }
+  if (!pool) {
+    const connectionString = process.env.DATABASE_URL;
+    const config = {
+      connectionString,
+      max: Math.min(20, Math.max(1, Number(process.env.PG_POOL_MAX || 5))),
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 10_000,
+    };
+    if (shouldUseSsl(connectionString)) config.ssl = { rejectUnauthorized: false };
+    pool = new Pool(config);
+    pool.on("error", (error) => console.error("Database pool error", error));
+  }
+  return pool;
+}
+
+function shouldUseSsl(connectionString) {
+  if (process.env.DATABASE_SSL) {
+    return /^(1|true|yes|required)$/i.test(process.env.DATABASE_SSL);
+  }
+  return /sslmode=require/i.test(connectionString) || /\.render\.com/i.test(connectionString);
+}
+
+function ensureSchema() {
+  if (!schemaReady) {
+    schemaReady = getPool()
+      .query(`
+        CREATE TABLE IF NOT EXISTS accounts (
+          username TEXT PRIMARY KEY,
+          name TEXT NOT NULL DEFAULT '',
+          email TEXT NOT NULL DEFAULT '',
+          salt TEXT NOT NULL,
+          password_hash TEXT NOT NULL,
+          data JSONB NOT NULL DEFAULT '{}'::jsonb,
+          summary JSONB NOT NULL DEFAULT '{}'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS account_sessions (
+          token_hash TEXT PRIMARY KEY,
+          username TEXT NOT NULL REFERENCES accounts(username) ON DELETE CASCADE ON UPDATE CASCADE,
+          expires_at TIMESTAMPTZ NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS account_sessions_username_idx ON account_sessions(username);
+        CREATE INDEX IF NOT EXISTS account_sessions_expiry_idx ON account_sessions(expires_at);
+      `)
+      .catch((error) => {
+        schemaReady = null;
+        throw error;
+      });
+  }
+  return schemaReady;
+}
+
+async function readAccount(username) {
+  const result = await getPool().query(
+    `SELECT username, name, email, salt, password_hash, data, summary, created_at, updated_at
+       FROM accounts
+      WHERE username = $1`,
+    [normalizeUsername(username)],
+  );
+  return result.rows[0] ? mapAccount(result.rows[0]) : null;
+}
+
+async function upsertAccount(account) {
+  await getPool().query(
+    `INSERT INTO accounts (
+       username, name, email, salt, password_hash, data, summary, created_at, updated_at
+     ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)
+     ON CONFLICT (username) DO UPDATE SET
+       name = EXCLUDED.name,
+       email = EXCLUDED.email,
+       salt = EXCLUDED.salt,
+       password_hash = EXCLUDED.password_hash,
+       data = EXCLUDED.data,
+       summary = EXCLUDED.summary,
+       updated_at = EXCLUDED.updated_at`,
+    [
+      account.username,
+      account.name,
+      account.email,
+      account.salt,
+      account.passwordHash,
+      JSON.stringify(account.data),
+      JSON.stringify(account.summary),
+      account.createdAt,
+      account.updatedAt,
+    ],
+  );
+}
+
+function mapAccount(row) {
+  return {
+    username: row.username,
+    name: row.name,
+    email: row.email,
+    salt: row.salt,
+    passwordHash: row.password_hash,
+    data: row.data || null,
+    summary: row.summary || null,
+    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+    updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+  };
+}
+
+function publicResponse(account, token) {
+  return {
+    user: {
+      username: account.username,
+      name: account.name,
+      email: account.email,
+      createdAt: account.createdAt,
+      updatedAt: account.updatedAt,
+    },
+    data: account.data || null,
+    ...(token ? { token } : {}),
+  };
+}
+
+async function runMaintenanceTasks() {
+  if (!process.env.DATABASE_URL) return;
+  await ensureSchema();
+
+  const deleteUsers = splitEnvList(process.env.DELETE_ACCOUNT_NOW);
+  for (const username of deleteUsers) {
+    await getPool().query(`DELETE FROM accounts WHERE username = $1`, [normalizeUsername(username)]);
+  }
+
+  for (const [username, newPassword] of parseEnvPairs(process.env.CHANGE_PASSWORD)) {
+    if (!newPassword) continue;
+    const salt = crypto.randomBytes(16).toString("hex");
+    const passwordHash = await hashPassword(newPassword, salt);
+    await getPool().query(
+      `UPDATE accounts SET salt = $2, password_hash = $3, updated_at = NOW() WHERE username = $1`,
+      [normalizeUsername(username), salt, passwordHash],
+    );
+    await getPool().query(`DELETE FROM account_sessions WHERE username = $1`, [
+      normalizeUsername(username),
+    ]);
+  }
+
+  for (const [oldUsername, newUsername] of parseEnvPairs(process.env.CHANGE_USERNAME)) {
+    const oldValue = normalizeUsername(oldUsername);
+    const newValue = normalizeUsername(newUsername);
+    if (oldValue && /^[\p{L}\p{N}._-]{3,50}$/u.test(newValue)) {
+      await getPool().query(`UPDATE accounts SET username = $2, updated_at = NOW() WHERE username = $1`, [
+        oldValue,
+        newValue,
+      ]);
+    }
+  }
+
+  for (const [username, name] of parseEnvPairs(process.env.CHANGE_NAME)) {
+    await getPool().query(`UPDATE accounts SET name = $2, updated_at = NOW() WHERE username = $1`, [
+      normalizeUsername(username),
+      cleanText(name, 80),
+    ]);
+  }
+
+  for (const [username, email] of parseEnvPairs(process.env.CHANGE_EMAIL)) {
+    await getPool().query(`UPDATE accounts SET email = $2, updated_at = NOW() WHERE username = $1`, [
+      normalizeUsername(username),
+      cleanText(email, 120),
+    ]);
+  }
+
+  const storedAccounts = await getPool().query(`SELECT username, data FROM accounts`);
+  for (const row of storedAccounts.rows) {
+    const compact = compactAccountData(row.data);
+    const summary = buildSummary(compact);
+    await getPool().query(
+      `UPDATE accounts
+          SET data = $2::jsonb, summary = $3::jsonb, updated_at = NOW()
+        WHERE username = $1
+          AND data IS DISTINCT FROM $2::jsonb`,
+      [row.username, JSON.stringify(compact), JSON.stringify(summary)],
+    );
+  }
+}
+
+function splitEnvList(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseEnvPairs(value) {
+  return splitEnvList(value)
+    .map((item) => {
+      const separator = item.indexOf(":");
+      return separator > 0
+        ? [item.slice(0, separator).trim(), item.slice(separator + 1).trim()]
+        : null;
+    })
+    .filter(Boolean);
+}
+
+async function readJsonBody(request) {
+  const contentTypeValue = String(request.headers["content-type"] || "");
+  if (!contentTypeValue.toLowerCase().startsWith("application/json")) {
+    const error = new Error("Ù†ÙˆØ¹ Ø§Ù„Ù…Ø­ØªÙˆÙ‰ ÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† JSON");
+    error.status = 415;
+    throw error;
+  }
+
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of request) {
+    total += chunk.length;
+    if (total > maxBodyBytes) {
+      const error = new Error("Ø­Ø¬Ù… Ø§Ù„Ø·Ù„Ø¨ Ø£ÙƒØ¨Ø± Ù…Ù† Ø§Ù„Ù…Ø³Ù…ÙˆØ­");
+      error.status = 413;
+      throw error;
+    }
+    chunks.push(chunk);
+  }
+  if (!chunks.length) return {};
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    const error = new Error("ØµÙŠØºØ© JSON ØºÙŠØ± ØµØ§Ù„Ø­Ø©");
+    error.status = 400;
+    throw error;
+  }
+}
+
+function handleApiError(response, label, error) {
+  console.error(label, error);
+  const status = Number(error?.status);
+  if ([400, 413, 415].includes(status)) {
+    return sendJson(response, status, { error: cleanText(error.message, 180) });
+  }
+  return sendJson(response, 500, { error: "ØªØ¹Ø°Ø± Ø¥ÙƒÙ…Ø§Ù„ Ø§Ù„Ø·Ù„Ø¨ Ø§Ù„Ø¢Ù†" });
+}
+
+function cleanText(value, max = 240) {
+  return String(value || "").trim().slice(0, max);
+}
+
+function cleanId(value) {
+  const id = String(value || "");
+  return /^[a-zA-Z0-9._:-]{1,240}$/.test(id) ? id : "";
+}
+
+function normalizeUsername(value) {
+  return cleanText(value, 50).toLocaleLowerCase("ar-SA");
+}
+
+function sendJson(response, status, body, headers = {}) {
+  response.writeHead(status, { ...jsonHeaders, ...securityHeaders, ...headers });
+  response.end(JSON.stringify(body));
+}
+
+function sendText(response, status, body, headers = {}) {
+  response.writeHead(status, {
+    ...securityHeaders,
+    "Content-Type": "text/plain; charset=utf-8",
+    ...headers,
+  });
+  response.end(body);
+}
+
+function contentType(extension) {
+  return {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
+  }[extension.toLowerCase()] || "application/octet-stream";
+}
+
+function cacheControl(filePath) {
+  const name = path.basename(filePath);
+  return ["index.html", "app.js", "core.mjs", "styles.css", "sw.js"].includes(name)
+    ? "no-cache"
+    : "public, max-age=3600";
+}

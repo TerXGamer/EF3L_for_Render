@@ -4463,7 +4463,16 @@ html[data-layout="focus"] #upcomingTasks .task-card {
 
 html[data-layout="focus"] .task-card.has-quick-check,
 html[data-layout="focus"] #upcomingTasks .task-card.has-quick-check {
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 54px minmax(0, 1fr);
+}
+
+html[data-layout="focus"] .focus-task-check {
+  width: 50px;
+  min-width: 50px;
+  height: 50px;
+  min-height: 50px;
+  aspect-ratio: 1;
+  border-radius: 50%;
 }
 
 html[data-layout="focus"] .focus-task-menu {
@@ -4487,7 +4496,7 @@ html[data-layout="focus"] .task-card:not(.has-quick-check) .task-actions [data-a
 }
 
 html[data-layout="focus"] .task-card.has-quick-check .task-actions [data-action="complete"] {
-  display: none;
+  display: inline-flex;
 }
 
 html[data-layout="focus"] .task-actions [data-action="soft-delete"],
@@ -4512,7 +4521,7 @@ html[data-layout="focus"] .subnav::-webkit-scrollbar {
 @media (max-width: 430px) {
   html[data-layout="focus"] .task-card.has-quick-check,
   html[data-layout="focus"] #upcomingTasks .task-card.has-quick-check {
-    grid-template-columns: 38px minmax(0, 1fr);
+    grid-template-columns: 50px minmax(0, 1fr);
   }
 
   html[data-layout="focus"] .task-actions,

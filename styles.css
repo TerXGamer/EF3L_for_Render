@@ -4448,3 +4448,69 @@ html[data-layout="focus"] .nav-create {
     padding-inline: 11px;
   }
 }
+
+/* Keep every task readable and expose its context actions in the focus interface. */
+html[data-layout="focus"] .task-card,
+html[data-layout="focus"] #upcomingTasks .task-card {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+html[data-layout="focus"] .task-card.has-quick-check,
+html[data-layout="focus"] #upcomingTasks .task-card.has-quick-check {
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+
+html[data-layout="focus"] .focus-task-menu {
+  display: none !important;
+}
+
+html[data-layout="focus"] .task-actions,
+html[data-layout="focus"] #upcomingTasks .task-actions {
+  display: grid !important;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 7px;
+  width: 100%;
+  max-width: none;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+}
+
+html[data-layout="focus"] .task-card:not(.has-quick-check) .task-actions [data-action="complete"] {
+  display: inline-flex;
+}
+
+html[data-layout="focus"] .task-card.has-quick-check .task-actions [data-action="complete"] {
+  display: none;
+}
+
+html[data-layout="focus"] .task-actions [data-action="soft-delete"],
+html[data-layout="focus"] .task-actions [data-action="delete-instance"],
+html[data-layout="focus"] .task-actions [data-action="delete-task"] {
+  grid-column: 1 / -1;
+}
+
+html[data-layout="focus"] .task-actions button {
+  justify-content: center;
+  min-width: 0;
+}
+
+html[data-layout="focus"] .subnav {
+  scrollbar-width: none;
+}
+
+html[data-layout="focus"] .subnav::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 430px) {
+  html[data-layout="focus"] .task-card.has-quick-check,
+  html[data-layout="focus"] #upcomingTasks .task-card.has-quick-check {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  html[data-layout="focus"] .task-actions,
+  html[data-layout="focus"] #upcomingTasks .task-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

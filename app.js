@@ -3260,8 +3260,9 @@ function syncIntervalState() {
 }
 
 function getInstancesByStatus(status) {
+  const hidden = new Set(state.settings.hiddenListInstanceIds || []);
   return Object.values(state.instances)
-    .filter((item) => item.status === status)
+    .filter((item) => item.status === status && !hidden.has(item.id))
     .sort(sortInstances);
 }
 

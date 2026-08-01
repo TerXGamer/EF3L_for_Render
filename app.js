@@ -827,7 +827,10 @@ function switchView(view) {
     return;
   }
   if (document.body.classList.contains("task-sheet-open")) closeTaskSheet(false);
-  currentView = viewRedirects[view] || view;
+  const nextView = viewRedirects[view] || view;
+  const viewChanged = nextView !== currentView;
+  currentView = nextView;
+  document.documentElement.dataset.view = currentView;
   const hasDirectNavigation = usesFocusInterface() && Boolean(
     document.querySelector(`.focus-direct-nav[data-view="${currentView}"]`),
   );
@@ -847,6 +850,9 @@ function switchView(view) {
     button.classList.toggle("active", button.dataset.view === subnavView);
   });
   render();
+  if (viewChanged && usesFocusInterface() && window.innerWidth <= 820) {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
 }
 
 function showLogin() {
@@ -1448,6 +1454,8 @@ async function syncToCloud(manual = false) {
   }
 
   const revisionAtStart = localRevision;
+  document.body.classList.add("is-syncing");
+  el.syncNow?.setAttribute("aria-busy", "true");
   cloudSyncPromise = (async () => {
     try {
       const attemptedAt = new Date().toISOString();
@@ -1484,6 +1492,8 @@ async function syncToCloud(manual = false) {
       return false;
     } finally {
       cloudSyncPromise = null;
+      document.body.classList.remove("is-syncing");
+      el.syncNow?.removeAttribute("aria-busy");
       if (pendingCloudSync && navigator.onLine !== false) scheduleCloudSave(CLOUD_SYNC_DELAY);
     }
   })();
@@ -2187,6 +2197,36 @@ function deleteAllNever() {
   toast("تم حذف الكل");
 }
 
+function runTaskCardTransition(button, className, callback) {
+  const card = button.closest(".task-card");
+  const reduceMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (!card || !usesFocusInterface() || reduceMotion) {
+    callback();
+    return;
+  }
+  if (card.dataset.busy === "true") return;
+  card.dataset.busy = "true";
+  card.setAttribute("aria-busy", "true");
+  card.querySelectorAll("button").forEach((item) => {
+    item.disabled = true;
+  });
+  card.classList.add(className);
+  setTimeout(() => {
+    try {
+      callback();
+    } finally {
+      if (card.isConnected) {
+        card.classList.remove(className);
+        card.removeAttribute("aria-busy");
+        delete card.dataset.busy;
+        card.querySelectorAll("button").forEach((item) => {
+          item.disabled = false;
+        });
+      }
+    }
+  }, className === "is-completing" ? 240 : 180);
+}
+
 function handleActionClick(event) {
   const button = event.target.closest("[data-action]");
   if (!button) return;
@@ -2198,21 +2238,39 @@ function handleActionClick(event) {
       switchView("settings");
       el.taskTitle.focus();
     }
+    return;
   }
   if (action === "toggle-task-actions") {
     const card = button.closest(".task-card");
     if (card) card.classList.toggle("actions-open");
     return;
   }
-  if (action === "complete") completeInstance(id);
-  if (action === "cancel-never") markInstanceNotDone(id, false);
-  if (action === "force-never") markInstanceNotDone(id, true);
-  if (action === "soft-delete") moveInstance(id, "deleted", "حذف التفعيل الحالي");
-  if (action === "move-required") moveInstance(id, "requiredOverdue", "نقل للمهام الواجبة");
-  if (action === "move-optional") moveInstance(id, "optionalOverdue", "نقل للمهام غير المهمة");
-  if (action === "move-never") moveInstance(id, "never", "نقل للمهام التي لم تنفذ");
-  if (action === "move-completed") completeInstance(id);
-  if (action === "restore-main") requeueInstance(id);
+  if (action === "complete" || action === "move-completed") {
+    runTaskCardTransition(button, "is-completing", () => completeInstance(id));
+    return;
+  }
+  if (action === "cancel-never" || action === "force-never") {
+    runTaskCardTransition(button, "is-moving", () => markInstanceNotDone(id, action === "force-never"));
+    return;
+  }
+  if (action === "soft-delete") {
+    runTaskCardTransition(button, "is-removing", () => moveInstance(id, "deleted", "حذف التفعيل الحالي"));
+    return;
+  }
+  if (action === "move-required" || action === "move-optional" || action === "move-never") {
+    const destinations = {
+      "move-required": ["requiredOverdue", "نقل للمهام الواجبة"],
+      "move-optional": ["optionalOverdue", "نقل للمهام غير المهمة"],
+      "move-never": ["never", "نقل للمهام التي لم تنفذ"],
+    };
+    const [status, reason] = destinations[action];
+    runTaskCardTransition(button, "is-moving", () => moveInstance(id, status, reason));
+    return;
+  }
+  if (action === "restore-main") {
+    runTaskCardTransition(button, "is-moving", () => requeueInstance(id));
+    return;
+  }
   if (action === "delete-instance") deleteInstance(id);
   if (action === "edit-task") fillTaskForm(id);
   if (action === "delete-task") deleteTask(id);

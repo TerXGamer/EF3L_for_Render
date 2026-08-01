@@ -4550,6 +4550,10 @@ html[data-layout="focus"] .sidebar-brand .brand-mark {
 }
 
 @media (max-width: 430px) {
+  html[data-layout="focus"] {
+    min-width: 0;
+  }
+
   html[data-layout="focus"] .task-card.has-quick-check,
   html[data-layout="focus"] #upcomingTasks .task-card.has-quick-check {
     grid-template-columns: 50px minmax(0, 1fr);
@@ -4558,5 +4562,269 @@ html[data-layout="focus"] .sidebar-brand .brand-mark {
   html[data-layout="focus"] .task-actions,
   html[data-layout="focus"] #upcomingTasks .task-actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Focus 2.1: interaction polish and mobile motion. */
+html[data-layout="focus"] .view.active {
+  animation: focus-view-enter 190ms cubic-bezier(0.2, 0.72, 0.25, 1);
+  transform-origin: top center;
+}
+
+@keyframes focus-view-enter {
+  from {
+    opacity: 0.35;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+html[data-layout="focus"] button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    color 130ms ease,
+    background-color 130ms ease,
+    border-color 130ms ease,
+    box-shadow 130ms ease,
+    transform 110ms ease;
+}
+
+html[data-layout="focus"] button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+html[data-layout="focus"] button:disabled,
+html[data-layout="focus"] .task-card[aria-busy="true"] {
+  pointer-events: none;
+}
+
+html[data-layout="focus"] .task-card,
+html[data-layout="focus"] #upcomingTasks .task-card {
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--text) 5%, transparent);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html[data-layout="focus"] .task-card:hover,
+  html[data-layout="focus"] #upcomingTasks .task-card:hover {
+    border-color: color-mix(in srgb, var(--teal) 38%, var(--line));
+    box-shadow: 0 8px 22px color-mix(in srgb, var(--text) 8%, transparent);
+    transform: translateY(-2px);
+  }
+}
+
+html[data-layout="focus"] .task-card.is-completing {
+  animation: focus-task-complete 240ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+html[data-layout="focus"] .task-card.is-moving {
+  animation: focus-task-move 180ms ease-in both;
+}
+
+html[data-layout="focus"] .task-card.is-removing {
+  animation: focus-task-remove 180ms ease-in both;
+}
+
+html[data-layout="focus"] .task-card.is-completing,
+html[data-layout="focus"] .task-card.is-moving,
+html[data-layout="focus"] .task-card.is-removing {
+  will-change: transform, opacity;
+}
+
+html[data-layout="focus"] .task-card.is-completing .focus-task-check,
+html[data-layout="focus"] .task-card.is-completing [data-action="complete"] {
+  color: #ffffff;
+  border-color: var(--teal);
+  background: var(--teal);
+}
+
+html[data-layout="focus"] .task-card.is-completing .focus-task-check svg,
+html[data-layout="focus"] .task-card.is-completing [data-action="complete"] svg {
+  animation: focus-check-pop 210ms ease-out both;
+}
+
+@keyframes focus-task-complete {
+  0% { opacity: 1; transform: scale(1); }
+  42% { opacity: 1; transform: scale(0.985); }
+  100% { opacity: 0; transform: translateY(-8px) scale(0.985); }
+}
+
+@keyframes focus-task-move {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(10px) scale(0.99); }
+}
+
+@keyframes focus-task-remove {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(0.975); }
+}
+
+@keyframes focus-check-pop {
+  0% { transform: scale(0.72); }
+  70% { transform: scale(1.16); }
+  100% { transform: scale(1); }
+}
+
+html[data-layout="focus"] .focus-task-check {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--teal) 9%, transparent);
+  transition:
+    color 130ms ease,
+    background-color 130ms ease,
+    border-color 130ms ease,
+    box-shadow 130ms ease,
+    transform 130ms ease;
+}
+
+html[data-layout="focus"] .focus-task-check:hover,
+html[data-layout="focus"] .focus-task-check:focus-visible {
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--teal) 26%, transparent);
+  transform: scale(1.06);
+}
+
+html[data-layout="focus"] .task-actions button {
+  min-height: 44px;
+  gap: 5px;
+  padding: 7px 8px;
+  line-height: 1.25;
+}
+
+html[data-layout="focus"] .task-actions button svg {
+  flex: 0 0 auto;
+}
+
+html[data-layout="focus"] .task-actions button span {
+  display: block;
+  min-width: 0;
+  overflow: visible;
+  font-size: 10px;
+  line-height: 1.25;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+html[data-layout="focus"] .subnav {
+  scroll-snap-type: x proximity;
+  overscroll-behavior-inline: contain;
+}
+
+html[data-layout="focus"] .subnav-button {
+  scroll-snap-align: start;
+}
+
+html[data-layout="focus"] .subnav-button.active {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--teal) 16%, transparent);
+}
+
+html[data-layout="focus"] .day-progress-ring {
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--teal) 13%, transparent);
+}
+
+html[data-layout="focus"] body.is-syncing #syncNow svg {
+  animation: focus-sync-spin 720ms linear infinite;
+}
+
+@keyframes focus-sync-spin {
+  to { transform: rotate(-360deg); }
+}
+
+html[data-layout="focus"] .toast {
+  border-right: 3px solid var(--teal);
+  box-shadow: 0 12px 30px color-mix(in srgb, #000000 22%, transparent);
+}
+
+@media (max-width: 820px) {
+  html[data-layout="focus"] .mobile-brandbar,
+  html[data-layout="focus"] .sidebar {
+    background: color-mix(in srgb, var(--app-bar) 94%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(1.25);
+    backdrop-filter: blur(16px) saturate(1.25);
+  }
+
+  html[data-layout="focus"] .mobile-brandbar {
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--text) 5%, transparent);
+  }
+
+  html[data-layout="focus"] .sidebar {
+    border-top: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+    box-shadow: 0 -10px 28px color-mix(in srgb, var(--text) 10%, transparent);
+  }
+
+  html[data-layout="focus"] .sidebar .nav-button:not(.nav-create)::before {
+    position: absolute;
+    top: 1px;
+    width: 18px;
+    height: 2px;
+    border-radius: 2px;
+    content: "";
+    background: var(--teal);
+    opacity: 0;
+    transform: scaleX(0.35);
+    transition: opacity 130ms ease, transform 160ms ease;
+  }
+
+  html[data-layout="focus"] .sidebar .nav-button.active:not(.nav-create)::before {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+
+  html[data-layout="focus"] .sidebar .nav-button svg {
+    transition: transform 150ms ease;
+  }
+
+  html[data-layout="focus"] .sidebar .nav-button.active:not(.nav-create) svg {
+    transform: translateY(-1px) scale(1.08);
+  }
+
+  html[data-layout="focus"] .sidebar .nav-create::before {
+    position: absolute;
+    inset: -5px;
+    border: 1px solid color-mix(in srgb, var(--teal) 32%, transparent);
+    border-radius: inherit;
+    content: "";
+    pointer-events: none;
+  }
+
+  html[data-layout="focus"] .sidebar .nav-create {
+    position: relative;
+  }
+
+  html[data-layout="focus"] .sidebar .nav-create:hover,
+  html[data-layout="focus"] .sidebar .nav-create:focus-visible {
+    box-shadow: 0 11px 26px color-mix(in srgb, var(--teal) 42%, transparent);
+    transform: translateY(-2px) scale(1.04);
+  }
+
+  html[data-layout="focus"] .sidebar .nav-create:active {
+    transform: scale(0.94);
+  }
+
+  html[data-layout="focus"] .sidebar .nav-create svg {
+    transition: transform 180ms ease;
+  }
+
+  html[data-layout="focus"] .sidebar .nav-create:hover svg,
+  html[data-layout="focus"] .sidebar .nav-create:focus-visible svg {
+    transform: rotate(90deg);
+  }
+
+  html[data-layout="focus"] .toast {
+    right: auto;
+    bottom: calc(86px + env(safe-area-inset-bottom));
+    left: 50%;
+    width: max-content;
+    max-width: calc(100vw - 28px);
+    text-align: center;
+    transform: translate(-50%, 12px) scale(0.98);
+  }
+
+  html[data-layout="focus"] .toast.show {
+    transform: translate(-50%, 0) scale(1);
   }
 }

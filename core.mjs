@@ -288,3 +288,30 @@ export function calculateStats(items) {
     items: eligible,
   };
 }
+
+export function findDuplicateInstanceIds(instances) {
+  const groups = new Map();
+  (instances || []).forEach((instance) => {
+    if (!instance?.id || !instance.taskId || !instance.date || !instance.status) return;
+    const key = `${instance.taskId}:${instance.date}:${instance.status}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(instance);
+  });
+
+  const duplicates = [];
+  groups.forEach((items) => {
+    if (items.length < 2) return;
+    const canonicalId = `${items[0].taskId}:${items[0].date}`;
+    const keep = items.find((item) => item.id === canonicalId) || items.slice().sort((a, b) =>
+      String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")),
+    )[0];
+    items.forEach((item) => {
+      if (item.id !== keep.id) duplicates.push(item.id);
+    });
+  });
+  return duplicates;
+}
+
+export function resolveNotDoneStatus(requiredOverdue, forceNever = false) {
+  return forceNever || !requiredOverdue ? "never" : "requiredOverdue";
+}

@@ -4449,6 +4449,12 @@ html[data-layout="focus"] .nav-create {
   }
 }
 
+html[data-layout="focus"] .subnav[data-group="settings"] .subnav-button[data-view="stats"],
+html[data-layout="focus"] #view-stats.active > .subnav,
+html[data-layout="focus"] #view-statsAudit.active > .subnav {
+  display: none !important;
+}
+
 /* Keep every task readable and expose its context actions in the focus interface. */
 html[data-layout="focus"] .task-card,
 html[data-layout="focus"] #upcomingTasks .task-card {

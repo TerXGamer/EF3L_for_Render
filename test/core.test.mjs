@@ -5,12 +5,31 @@ import {
   calculateStats,
   compactAccountData,
   daysBetween,
+  findDuplicateInstanceIds,
   hydrateAccountData,
   isTaskDueOn,
   latestDueDateOnOrBefore,
   mapTimeIntoWindow,
+  resolveNotDoneStatus,
   wouldCreateDependencyCycle,
 } from "../core.mjs";
+
+test("duplicate task instances keep the canonical daily record", () => {
+  const duplicates = findDuplicateInstanceIds([
+    { id: "task-a:2026-08-01", taskId: "task-a", date: "2026-08-01", status: "main" },
+    { id: "retry:1", taskId: "task-a", date: "2026-08-01", status: "main", updatedAt: "2026-08-01T01:00:00Z" },
+    { id: "retry:2", taskId: "task-a", date: "2026-08-01", status: "main", updatedAt: "2026-08-01T02:00:00Z" },
+    { id: "retry:3", taskId: "task-a", date: "2026-08-01", status: "completed" },
+    { id: "retry:4", taskId: "task-a", date: "2026-08-02", status: "main" },
+  ]);
+  assert.deepEqual(duplicates.sort(), ["retry:1", "retry:2"]);
+});
+
+test("not-done routing respects required and forced choices", () => {
+  assert.equal(resolveNotDoneStatus(true, false), "requiredOverdue");
+  assert.equal(resolveNotDoneStatus(false, false), "never");
+  assert.equal(resolveNotDoneStatus(true, true), "never");
+});
 
 test("date arithmetic is stable across daylight-saving boundaries", () => {
   assert.equal(daysBetween("2026-03-07", "2026-03-09"), 2);

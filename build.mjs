@@ -2,7 +2,7 @@ import { access, readFile, writeFile } from "node:fs/promises";
 import { brotliCompressSync } from "node:zlib";
 import { icons } from "lucide";
 
-const requiredFiles = ["index.html", "styles.css", "app.js", "core.mjs", "server.mjs"];
+const requiredFiles = ["index.html", "styles.css", "app.js", "core.mjs", "server.mjs", "logo.png"];
 
 await Promise.all(requiredFiles.map((file) => access(file)));
 

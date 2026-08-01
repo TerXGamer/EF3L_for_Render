@@ -2,6 +2,7 @@ import {
   addDays,
   calculateStats,
   compactAccountData,
+  findDuplicateInstanceIds,
   forEachDate,
   hydrateAccountData,
   isTaskDueOn as coreIsTaskDueOn,
@@ -10,6 +11,7 @@ import {
   maxDate,
   parseLocalDate as parseDate,
   rangeDates,
+  resolveNotDoneStatus,
   timeToMinutes,
   todayISO,
   wouldCreateDependencyCycle,
@@ -1608,7 +1610,21 @@ function refreshSchedule() {
     }
   });
 
+  changed = deduplicateTaskInstances() || changed;
+
   if (changed) saveState();
+}
+
+function deduplicateTaskInstances() {
+  const duplicateIds = findDuplicateInstanceIds(Object.values(state.instances));
+  if (!duplicateIds.length) return false;
+  const removedAt = new Date().toISOString();
+  duplicateIds.forEach((id) => {
+    state.meta.instanceTombstones[id] = removedAt;
+    delete state.instances[id];
+    selectedNever.delete(id);
+  });
+  return true;
 }
 
 function createInstance(task, date) {
@@ -2089,22 +2105,35 @@ function requeueInstance(id) {
   const instance = state.instances[id];
   if (!instance) return;
   const now = new Date().toISOString();
-  const retryId = `retry:${uid("run")}`;
-  state.instances[retryId] = {
-    ...clone(instance),
-    id: retryId,
-    date: todayISO(),
-    status: "main",
-    source: "retry",
-    createdAt: now,
-    updatedAt: now,
-    movedAt: null,
-    completedAt: null,
-    completedFrom: null,
-    history: [...(instance.history || []), { at: now, action: "أعيدت كمحاولة جديدة اليوم" }],
-  };
+  const today = todayISO();
+  const hidden = new Set(state.settings.hiddenListInstanceIds || []);
+  const existingToday = Object.values(state.instances).find((item) =>
+    item.id !== id && item.taskId === instance.taskId && item.date === today && item.status === "main",
+  );
+  if (existingToday) {
+    hidden.delete(existingToday.id);
+    existingToday.updatedAt = now;
+    existingToday.history = [...(existingToday.history || []), { at: now, action: "أعيدت لليوم دون إنشاء نسخة" }];
+  } else {
+    const retryId = `retry:${uid("run")}`;
+    state.instances[retryId] = {
+      ...clone(instance),
+      id: retryId,
+      date: today,
+      status: "main",
+      source: "retry",
+      createdAt: now,
+      updatedAt: now,
+      movedAt: null,
+      completedAt: null,
+      completedFrom: null,
+      history: [...(instance.history || []), { at: now, action: "أعيدت كمحاولة جديدة اليوم" }],
+    };
+  }
+  state.settings.hiddenListInstanceIds = Array.from(hidden);
   hideListInstances([id]);
   selectedNever.delete(id);
+  deduplicateTaskInstances();
   saveState();
   refreshSchedule();
   render();
@@ -2176,7 +2205,8 @@ function handleActionClick(event) {
     return;
   }
   if (action === "complete") completeInstance(id);
-  if (action === "cancel-never") moveInstance(id, "never", "إلغاء: لم تنفذ");
+  if (action === "cancel-never") markInstanceNotDone(id, false);
+  if (action === "force-never") markInstanceNotDone(id, true);
   if (action === "soft-delete") moveInstance(id, "deleted", "حذف التفعيل الحالي");
   if (action === "move-required") moveInstance(id, "requiredOverdue", "نقل للمهام الواجبة");
   if (action === "move-optional") moveInstance(id, "optionalOverdue", "نقل للمهام غير المهمة");
@@ -2205,6 +2235,13 @@ function handleActionClick(event) {
     toggleDataMonth(Number(button.dataset.month));
   }
   if (action === "admin-reveal") openAdminReveal(button.dataset.username);
+}
+
+function markInstanceNotDone(id, forceNever) {
+  const instance = state.instances[id];
+  if (!instance) return;
+  const status = resolveNotDoneStatus(instance.requiredOverdue, forceNever);
+  moveInstance(id, status, forceNever ? "لم تنفذ إجباري" : "لم تنفذ");
 }
 
 function handleSelectionChange(event) {
@@ -2778,8 +2815,10 @@ function taskSettingCard(task) {
 
 function instanceActions(instance, type) {
   const commonMain = [
-    ["primary-button", "complete", "circle-check", "تم"],
+    ["primary-button", "complete", "circle-check", "تم التنفيذ"],
     ["ghost-button", "cancel-never", "circle-x", "لم تنفذ"],
+    ["ghost-button", "force-never", "badge-alert", "لم تنفذ إجباري"],
+    ["ghost-button", "move-required", "badge-alert", "نقل للواجبة"],
     ["ghost-button", "edit-task", "settings-2", "الإعداد", instance.taskId],
     ["ghost-button danger", "soft-delete", "trash-2", "حذف"],
   ];

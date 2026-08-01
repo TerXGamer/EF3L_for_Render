@@ -2780,8 +2780,8 @@ function instanceActions(instance, type) {
   const commonMain = [
     ["primary-button", "complete", "circle-check", "تم"],
     ["ghost-button", "cancel-never", "circle-x", "لم تنفذ"],
-    ["ghost-button danger", "soft-delete", "trash-2", "حذف"],
     ["ghost-button", "edit-task", "settings-2", "الإعداد", instance.taskId],
+    ["ghost-button danger", "soft-delete", "trash-2", "حذف"],
   ];
   const actionsByType = {
     main: commonMain,
